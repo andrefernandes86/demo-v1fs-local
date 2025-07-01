@@ -13,7 +13,9 @@ RUN git clone https://github.com/trendmicro/tm-v1-fs-golang-sdk.git .
 # Build the client tools
 RUN make build && \
     ls -la /app/examples/ && \
-    echo "Build completed successfully"
+    echo "Build completed successfully" && \
+    ls -la /app/examples/client && \
+    ls -la /app/examples/scanfiles
 
 # Create final runtime image
 FROM alpine:latest
@@ -33,8 +35,8 @@ RUN addgroup -g 1000 tmfs && \
 WORKDIR /app
 
 # Copy built binaries from builder stage
-COPY --from=builder /app/examples/client /app/tmfs
-COPY --from=builder /app/examples/scanfiles /app/scanfiles
+COPY --from=builder /app/examples/client/client /app/tmfs
+COPY --from=builder /app/examples/scanfiles/scanfiles /app/scanfiles
 
 # Make binaries executable and set proper ownership
 RUN chmod +x /app/tmfs /app/scanfiles && \
