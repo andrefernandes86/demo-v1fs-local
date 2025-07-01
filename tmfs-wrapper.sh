@@ -116,6 +116,8 @@ if [ -n "$FILE_PATH" ]; then
     if [ -f "$FILE_PATH" ]; then
         echo "Debug: File exists and is readable"
         ls -la "$FILE_PATH"
+        echo "Debug: File content (first 10 bytes):"
+        head -c 10 "$FILE_PATH" | hexdump -C
     else
         echo "Debug: File does not exist or is not readable"
         echo "Debug: Current directory: $(pwd)"
@@ -124,5 +126,14 @@ if [ -n "$FILE_PATH" ]; then
     fi
 fi
 
+# Try different file path formats if the original fails
+echo "Debug: Original scan args: $SCAN_ARGS"
+if echo "$SCAN_ARGS" | grep -q 'file:'; then
+    # Try without file: prefix
+    SCAN_ARGS_ALT=$(echo "$SCAN_ARGS" | sed 's/file://')
+    echo "Debug: Alternative scan args (without file:): $SCAN_ARGS_ALT"
+fi
+
 # Execute the command
+echo "Debug: Final command: /app/tmfs $ARGS $SCAN_ARGS"
 exec /app/tmfs $ARGS $SCAN_ARGS 
