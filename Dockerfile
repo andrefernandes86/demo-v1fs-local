@@ -44,7 +44,8 @@ RUN mkdir -p /mnt/nfs && chown tmfs:tmfs /mnt/nfs
 # Copy wrapper and entrypoint scripts
 COPY tmfs-wrapper.sh /app/tmfs-wrapper.sh
 COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/tmfs-wrapper.sh /app/entrypoint.sh
+COPY realtime-monitor.sh /app/realtime-monitor.sh
+RUN chmod +x /app/tmfs-wrapper.sh /app/entrypoint.sh /app/realtime-monitor.sh
 
 # Switch to non-root user
 USER tmfs

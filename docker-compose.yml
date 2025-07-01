@@ -6,7 +6,7 @@ services:
     container_name: tmfs-scanner
     privileged: true  # Required for NFS mounting
     environment:
-      - ENDPOINT=my-release-visionone-filesecurity-scanner:50051
+      - ENDPOINT=192.168.200.50:50051
       - TLS=false
       - REGION=
       - APIKEY=
@@ -18,6 +18,11 @@ services:
       - DIGEST=true
       - TM_AM_SCAN_TIMEOUT_SECS=300
       - TM_AM_DISABLE_CERT_VERIFY=0
+      - NFS_SERVER=192.168.200.10
+      - NFS_SHARE=/mnt/nfs_share
+      - ACTION=quarantine
+      - SCAN_INTERVAL=30
+      - QUARANTINE_DIR=quarantine
     volumes:
       # Mount NFS shares here
       - nfs-share:/mnt/nfs:shared
@@ -25,13 +30,73 @@ services:
       - ./files:/app/files:ro
     networks:
       - tmfs-network
-    command: ["nfs"]  # Start with NFS support
+    command: ["monitor"]  # Start real-time monitoring
+
+  tmfs-scanner-delete:
+    build: .
+    container_name: tmfs-scanner-delete
+    privileged: true  # Required for NFS mounting
+    environment:
+      - ENDPOINT=192.168.200.50:50051
+      - TLS=false
+      - REGION=
+      - APIKEY=
+      - PML=false
+      - FEEDBACK=false
+      - VERBOSE=false
+      - ACTIVE_CONTENT=false
+      - TAGS=
+      - DIGEST=true
+      - TM_AM_SCAN_TIMEOUT_SECS=300
+      - TM_AM_DISABLE_CERT_VERIFY=0
+      - NFS_SERVER=192.168.200.10
+      - NFS_SHARE=/mnt/nfs_share
+      - ACTION=delete
+      - SCAN_INTERVAL=30
+    volumes:
+      # Mount NFS shares here
+      - nfs-share:/mnt/nfs:shared
+      # Mount local files for scanning
+      - ./files:/app/files:ro
+    networks:
+      - tmfs-network
+    command: ["monitor"]  # Start real-time monitoring with delete action
+
+  tmfs-scanner-report:
+    build: .
+    container_name: tmfs-scanner-report
+    privileged: true  # Required for NFS mounting
+    environment:
+      - ENDPOINT=192.168.200.50:50051
+      - TLS=false
+      - REGION=
+      - APIKEY=
+      - PML=false
+      - FEEDBACK=false
+      - VERBOSE=false
+      - ACTIVE_CONTENT=false
+      - TAGS=
+      - DIGEST=true
+      - TM_AM_SCAN_TIMEOUT_SECS=300
+      - TM_AM_DISABLE_CERT_VERIFY=0
+      - NFS_SERVER=192.168.200.10
+      - NFS_SHARE=/mnt/nfs_share
+      - ACTION=report_only
+      - SCAN_INTERVAL=30
+    volumes:
+      # Mount NFS shares here
+      - nfs-share:/mnt/nfs:shared
+      # Mount local files for scanning
+      - ./files:/app/files:ro
+    networks:
+      - tmfs-network
+    command: ["monitor"]  # Start real-time monitoring with report only
 
   tmfs-scan:
     build: .
     container_name: tmfs-scan
     environment:
-      - ENDPOINT=my-release-visionone-filesecurity-scanner:50051
+      - ENDPOINT=192.168.200.50:50051
       - TLS=false
       - REGION=
       - APIKEY=

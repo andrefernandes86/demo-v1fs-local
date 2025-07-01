@@ -13,6 +13,9 @@ help:
 	@echo "  run       - Run the container with NFS support"
 	@echo "  scan      - Scan a single file (usage: make scan FILE=path/to/file)"
 	@echo "  scanfiles - Scan multiple files (usage: make scanfiles PATH=/path/to/files)"
+	@echo "  monitor   - Start real-time monitoring with quarantine action"
+	@echo "  monitor-delete - Start real-time monitoring with delete action"
+	@echo "  monitor-report - Start real-time monitoring with report only"
 	@echo "  clean     - Clean up containers and images"
 	@echo "  help      - Show this help message"
 	@echo ""
@@ -119,13 +122,55 @@ nfs-quick:
 	@echo "3. Scan files: docker exec tmfs-nfs /app/tmfs scan file:/mnt/nfs/filename.txt --tls=false --addr=192.168.200.50:50051"
 	@echo "4. Cleanup: docker stop tmfs-nfs && docker rm tmfs-nfs"
 
-# Real-time monitoring
+# Real-time monitoring with action parameters
 monitor:
-	@echo "Starting real-time malicious file monitoring (quarantine mode)..."
-	chmod +x monitor-and-remove.sh
-	./monitor-and-remove.sh
+	@echo "Starting real-time monitoring with quarantine action..."
+	docker run -d \
+		--name tmfs-monitor \
+		--privileged \
+		--network host \
+		-e ENDPOINT=192.168.200.50:50051 \
+		-e TLS=false \
+		-e NFS_SERVER=192.168.200.10 \
+		-e NFS_SHARE=/mnt/nfs_share \
+		-e ACTION=quarantine \
+		-e SCAN_INTERVAL=30 \
+		-e QUARANTINE_DIR=quarantine \
+		tmfs-scanner:latest \
+		monitor
+	@echo "✅ Quarantine monitoring started. Check logs with: docker logs tmfs-monitor"
 
-auto-delete:
-	@echo "Starting automatic malicious file deletion..."
-	chmod +x auto-delete-malware.sh
-	./auto-delete-malware.sh 
+monitor-delete:
+	@echo "Starting real-time monitoring with delete action..."
+	docker run -d \
+		--name tmfs-monitor-delete \
+		--privileged \
+		--network host \
+		-e ENDPOINT=192.168.200.50:50051 \
+		-e TLS=false \
+		-e NFS_SERVER=192.168.200.10 \
+		-e NFS_SHARE=/mnt/nfs_share \
+		-e ACTION=delete \
+		-e SCAN_INTERVAL=30 \
+		tmfs-scanner:latest \
+		monitor
+	@echo "✅ Delete monitoring started. Check logs with: docker logs tmfs-monitor-delete"
+
+monitor-report:
+	@echo "Starting real-time monitoring with report only..."
+	docker run -d \
+		--name tmfs-monitor-report \
+		--privileged \
+		--network host \
+		-e ENDPOINT=192.168.200.50:50051 \
+		-e TLS=false \
+		-e NFS_SERVER=192.168.200.10 \
+		-e NFS_SHARE=/mnt/nfs_share \
+		-e ACTION=report_only \
+		-e SCAN_INTERVAL=30 \
+		tmfs-scanner:latest \
+		monitor
+	@echo "✅ Report-only monitoring started. Check logs with: docker logs tmfs-monitor-report"
+
+# Legacy commands for backward compatibility
+auto-delete: monitor-delete 

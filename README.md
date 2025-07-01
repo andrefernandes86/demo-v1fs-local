@@ -266,26 +266,115 @@ docker run -it --rm tmfs-scanner /bin/sh
 - API keys should be provided via environment variables, not command line
 - Consider using Docker secrets for sensitive configuration
 
-## Real-time Malicious File Monitoring
+## Real-time Malicious File Monitoring with Action Parameters
 
-This repository includes real-time monitoring scripts that automatically detect and handle malicious files:
+The container includes real-time monitoring capabilities that automatically detect and handle malicious files. You can specify the action as a Docker parameter:
 
-### Monitor and Quarantine
-- **File**: `monitor-and-remove.sh`
-- **Function**: Real-time monitoring with quarantine capability
-- **Action**: Moves malicious files to quarantine directory
-- **Usage**: `make monitor` or `./monitor-and-remove.sh`
+### Monitor Command with Action Parameters
 
-### Auto Delete Malware
-- **File**: `auto-delete-malware.sh`
-- **Function**: Real-time monitoring with immediate deletion
-- **Action**: Permanently deletes malicious files when detected
-- **Usage**: `make auto-delete` or `./auto-delete-malware.sh`
+```bash
+# Monitor with quarantine action (default)
+docker run -d \
+  --name tmfs-monitor \
+  --privileged \
+  --network host \
+  -e ENDPOINT=192.168.200.50:50051 \
+  -e TLS=false \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  tmfs-scanner:latest \
+  monitor
+
+# Monitor with specific action parameter
+docker run -d \
+  --name tmfs-monitor \
+  --privileged \
+  --network host \
+  -e ENDPOINT=192.168.200.50:50051 \
+  -e TLS=false \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  tmfs-scanner:latest \
+  monitor --action=quarantine
+
+# Monitor with delete action
+docker run -d \
+  --name tmfs-monitor \
+  --privileged \
+  --network host \
+  -e ENDPOINT=192.168.200.50:50051 \
+  -e TLS=false \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  tmfs-scanner:latest \
+  monitor --action=delete
+
+# Monitor with report only (no action taken)
+docker run -d \
+  --name tmfs-monitor \
+  --privileged \
+  --network host \
+  -e ENDPOINT=192.168.200.50:50051 \
+  -e TLS=false \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  tmfs-scanner:latest \
+  monitor --action=report_only
+
+# Monitor with custom parameters
+docker run -d \
+  --name tmfs-monitor \
+  --privileged \
+  --network host \
+  -e ENDPOINT=192.168.200.50:50051 \
+  -e TLS=false \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  tmfs-scanner:latest \
+  monitor \
+  --action=quarantine \
+  --scan-interval=60 \
+  --quarantine-dir=malware_quarantine
+```
+
+### Available Actions
+
+- **`quarantine`** (default): Move malicious files to a quarantine directory
+- **`delete`**: Permanently delete malicious files
+- **`report_only`**: Only report malicious files, take no action
+
+### Monitor Parameters
+
+- **`--action=<action>`**: Specify the action (quarantine, delete, report_only)
+- **`--nfs-server=<ip>`**: NFS server IP address
+- **`--nfs-share=<path>`**: NFS share path
+- **`--scan-interval=<seconds>`**: Scan interval in seconds (default: 30)
+- **`--quarantine-dir=<dir>`**: Quarantine directory name (default: quarantine)
+
+### Recursive Scanning
+
+The monitoring system automatically scans all subdirectories recursively and focuses on executable and script files:
+- `.exe`, `.dll`, `.bat`, `.ps1`, `.vbs`, `.js`, `.jar`
+- `.msi`, `.com`, `.scr`, `.pif`, `.cmd`, `.reg`
+- `.wsf`, `.hta`, `.lnk`
+
+### Using Docker Compose
+```bash
+# Start monitoring with quarantine action
+docker-compose up tmfs-scanner
+
+# Start monitoring with delete action
+docker-compose up tmfs-scanner-delete
+
+# Start monitoring with report only
+docker-compose up tmfs-scanner-report
+```
 
 ### Monitoring Features
-- **Real-time Detection**: Scans every 30 seconds for new files
-- **File Types Monitored**: .exe, .dll, .bat, .ps1, .vbs, .js, .jar, .msi, .com, .scr
-- **Automatic Action**: Quarantine or delete malicious files immediately
+- **Real-time Detection**: Scans every 30 seconds for new files (configurable)
+- **Recursive Scanning**: Automatically scans all subdirectories
+- **File Types Monitored**: Executable and script files (.exe, .dll, .bat, .ps1, .vbs, .js, .jar, .msi, .com, .scr, .pif, .cmd, .reg, .wsf, .hta, .lnk)
+- **Automatic Action**: Quarantine, delete, or report malicious files immediately
 - **Logging**: All actions are logged for audit purposes
 - **NFS Integration**: Works with your NFS share (192.168.200.10/mnt/nfs_share)
 - **Scanner Integration**: Uses your scanner endpoint (192.168.200.50:50051)

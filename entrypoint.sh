@@ -6,6 +6,13 @@ if [ "$1" = "help" ]; then
     echo "  docker run <image> nfs                    # Start container with NFS support"
     echo "  docker run <image> scan <file> [options]  # Scan a single file"
     echo "  docker run <image> scanfiles [options]    # Scan multiple files"
+    echo "  docker run <image> monitor [options]      # Real-time monitoring with action"
+    echo ""
+    echo "Real-time Monitoring:"
+    echo "  docker run <image> monitor                # Start monitoring with default settings"
+    echo "  docker run <image> monitor --action=quarantine    # Quarantine malicious files"
+    echo "  docker run <image> monitor --action=delete        # Delete malicious files"
+    echo "  docker run <image> monitor --action=report_only   # Report only, no action"
     echo ""
     echo "Environment variables:"
     echo "  ENDPOINT=<host:port>     # File Security service endpoint (default: localhost:50051)"
@@ -18,6 +25,11 @@ if [ "$1" = "help" ]; then
     echo "  ACTIVE_CONTENT=<true|false> # Enable active content detection (default: false)"
     echo "  TAGS=<tags>              # Comma-separated tags"
     echo "  DIGEST=<true|false>      # Enable digest calculation (default: true)"
+    echo "  ACTION=<action>          # Monitor action: quarantine, delete, report_only"
+    echo "  NFS_SERVER=<ip>          # NFS server IP (default: 192.168.200.10)"
+    echo "  NFS_SHARE=<path>         # NFS share path (default: /mnt/nfs_share)"
+    echo "  SCAN_INTERVAL=<seconds>  # Scan interval in seconds (default: 30)"
+    echo "  QUARANTINE_DIR=<dir>     # Quarantine directory name (default: quarantine)"
     exit 0
 fi
 
@@ -34,11 +46,44 @@ elif [ "$1" = "scan" ]; then
 elif [ "$1" = "scanfiles" ]; then
     shift
     exec /app/scanfiles "$@"
+elif [ "$1" = "monitor" ]; then
+    shift
+    # Parse monitor options
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --action=*)
+                ACTION="${1#*=}"
+                shift
+                ;;
+            --nfs-server=*)
+                NFS_SERVER="${1#*=}"
+                shift
+                ;;
+            --nfs-share=*)
+                NFS_SHARE="${1#*=}"
+                shift
+                ;;
+            --scan-interval=*)
+                SCAN_INTERVAL="${1#*=}"
+                shift
+                ;;
+            --quarantine-dir=*)
+                QUARANTINE_DIR="${1#*=}"
+                shift
+                ;;
+            *)
+                echo "Unknown monitor option: $1"
+                exit 1
+                ;;
+        esac
+    done
+    exec /app/realtime-monitor.sh
 else
     echo "Usage:"
     echo "  docker run <image> nfs                    # Start container with NFS support"
     echo "  docker run <image> scan <file> [options]  # Scan a single file"
     echo "  docker run <image> scanfiles [options]    # Scan multiple files"
+    echo "  docker run <image> monitor [options]      # Real-time monitoring with action"
     echo ""
     echo "Environment variables:"
     echo "  ENDPOINT=<host:port>     # File Security service endpoint (default: localhost:50051)"
@@ -51,5 +96,10 @@ else
     echo "  ACTIVE_CONTENT=<true|false> # Enable active content detection (default: false)"
     echo "  TAGS=<tags>              # Comma-separated tags"
     echo "  DIGEST=<true|false>      # Enable digest calculation (default: true)"
+    echo "  ACTION=<action>          # Monitor action: quarantine, delete, report_only"
+    echo "  NFS_SERVER=<ip>          # NFS server IP (default: 192.168.200.10)"
+    echo "  NFS_SHARE=<path>         # NFS share path (default: /mnt/nfs_share)"
+    echo "  SCAN_INTERVAL=<seconds>  # Scan interval in seconds (default: 30)"
+    echo "  QUARANTINE_DIR=<dir>     # Quarantine directory name (default: quarantine)"
     exit 1
 fi 
