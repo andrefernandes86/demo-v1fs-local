@@ -48,10 +48,12 @@ if [ "$1" = "nfs" ]; then
     tail -f /dev/null
 elif [ "$1" = "scan" ]; then
     shift
-    exec /app/tmfs-wrapper.sh scan "$@"
+    # Switch to tmfs user for scanning operations
+    exec su tmfs -c "/app/tmfs-wrapper.sh scan $*"
 elif [ "$1" = "scanfiles" ]; then
     shift
-    exec /app/scanfiles "$@"
+    # Switch to tmfs user for scanning operations
+    exec su tmfs -c "/app/scanfiles $*"
 elif [ "$1" = "monitor" ]; then
     shift
     # Parse monitor options
@@ -83,23 +85,23 @@ elif [ "$1" = "monitor" ]; then
                 ;;
         esac
     done
-    # Switch to root for NFS operations
-    exec su -c "/app/realtime-monitor.sh" root
+    # Run as root for NFS operations
+    exec /app/realtime-monitor.sh
 elif [ "$1" = "quarantine" ]; then
     shift
     ACTION=quarantine
-    # Switch to root for NFS operations
-    exec su -c "/app/realtime-monitor.sh" root
+    # Run as root for NFS operations
+    exec /app/realtime-monitor.sh
 elif [ "$1" = "delete" ]; then
     shift
     ACTION=delete
-    # Switch to root for NFS operations
-    exec su -c "/app/realtime-monitor.sh" root
+    # Run as root for NFS operations
+    exec /app/realtime-monitor.sh
 elif [ "$1" = "report" ]; then
     shift
     ACTION=report_only
-    # Switch to root for NFS operations
-    exec su -c "/app/realtime-monitor.sh" root
+    # Run as root for NFS operations
+    exec /app/realtime-monitor.sh
 else
     echo "Usage:"
     echo "  docker run <image> nfs                    # Start container with NFS support"

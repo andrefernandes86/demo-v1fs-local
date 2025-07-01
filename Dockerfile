@@ -53,8 +53,8 @@ COPY realtime-monitor.sh /app/realtime-monitor.sh
 RUN chmod +x /app/tmfs-wrapper.sh /app/entrypoint.sh /app/realtime-monitor.sh && \
     chown tmfs:tmfs /app/tmfs-wrapper.sh /app/entrypoint.sh /app/realtime-monitor.sh
 
-# Switch to non-root user
-USER tmfs
+# Keep as root for NFS operations, but switch to tmfs for other operations
+# USER tmfs
 
 # Set default environment variables
 ENV TM_AM_SCAN_TIMEOUT_SECS=300
