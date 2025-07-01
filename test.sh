@@ -95,7 +95,7 @@ docker run --rm \
     -e TM_ENDPOINT=192.168.200.50:30230 \
     -e TM_TLS=false \
     -e LOCAL_PATH="$LOCAL_PATH" \
-    -e ACTION=report_only \
+    -e ACTION=quarantine \
     -e SCAN_INTERVAL=5 \
     -v "$LOCAL_PATH:$LOCAL_PATH:shared" \
     tmfs-scanner monitor &
