@@ -87,17 +87,38 @@ mount_nfs() {
         rpcbind
         
         # Try mounting with nolock option to avoid statd issues
-        echo "Attempting NFS mount..."
-        if mount -t nfs -o nolock "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH" 2>/dev/null; then
+        echo "Attempting NFS mount with timeout..."
+        
+        # Test NFS connectivity first
+        echo "Testing NFS server connectivity..."
+        if ! ping -c 1 -W 5 "$NFS_SERVER" > /dev/null 2>&1; then
+            echo "❌ Cannot reach NFS server: $NFS_SERVER"
+            return 1
+        fi
+        
+        # Check if NFS share is available
+        echo "Checking NFS share availability..."
+        if ! showmount -e "$NFS_SERVER" | grep -q "$NFS_SHARE"; then
+            echo "❌ NFS share not available: $NFS_SHARE"
+            echo "Available shares:"
+            showmount -e "$NFS_SERVER" || echo "Cannot list shares"
+            return 1
+        fi
+        
+        # Try mounting with timeout
+        echo "Mounting NFS share..."
+        timeout 30s mount -t nfs -o nolock "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH" 2>/dev/null
+        if [ $? -eq 0 ]; then
             echo "✅ NFS mounted successfully at $MOUNT_PATH"
             return 0
         else
             echo "❌ Failed to mount NFS with nolock, trying without options..."
-            if mount -t nfs "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH" 2>/dev/null; then
+            timeout 30s mount -t nfs "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH" 2>/dev/null
+            if [ $? -eq 0 ]; then
                 echo "✅ NFS mounted successfully at $MOUNT_PATH"
                 return 0
             else
-                echo "❌ Failed to mount NFS"
+                echo "❌ Failed to mount NFS after timeout"
                 echo "NFS server: $NFS_SERVER"
                 echo "NFS share: $NFS_SHARE"
                 echo "Mount path: $MOUNT_PATH"
