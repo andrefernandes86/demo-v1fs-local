@@ -82,13 +82,31 @@ mount_nfs() {
         echo "Mounting NFS share..."
         mkdir -p "$MOUNT_PATH"
         
+        # Start rpcbind for NFS
+        echo "Starting rpcbind..."
+        rpcbind
+        
         # Try mounting with nolock option to avoid statd issues
+        echo "Attempting NFS mount..."
         if mount -t nfs -o nolock "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH" 2>/dev/null; then
-            echo "NFS mounted successfully at $MOUNT_PATH"
+            echo "✅ NFS mounted successfully at $MOUNT_PATH"
+            return 0
         else
-            echo "WARNING: Failed to mount NFS, continuing with local directory"
-            echo "You can manually mount NFS or use local directory scanning"
+            echo "❌ Failed to mount NFS with nolock, trying without options..."
+            if mount -t nfs "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH" 2>/dev/null; then
+                echo "✅ NFS mounted successfully at $MOUNT_PATH"
+                return 0
+            else
+                echo "❌ Failed to mount NFS"
+                echo "NFS server: $NFS_SERVER"
+                echo "NFS share: $NFS_SHARE"
+                echo "Mount path: $MOUNT_PATH"
+                return 1
+            fi
         fi
+    else
+        echo "NFS environment variables not set, skipping NFS mount"
+        return 0
     fi
 }
 
@@ -133,33 +151,47 @@ monitor_directory() {
     echo ""
     
     # Mount NFS if configured
-    mount_nfs
+    if ! mount_nfs; then
+        echo "❌ Failed to mount NFS, exiting"
+        exit 1
+    fi
     
     # Create quarantine directory
     mkdir -p "$dir/quarantine"
+    echo "✅ Quarantine directory ready: $dir/quarantine"
+    
+    # Show mounted filesystems
+    echo "Mounted filesystems:"
+    df -h | grep -E "(nfs|$dir)" || echo "No NFS mounts found"
+    echo ""
     
     while true; do
         echo "=== Scan Cycle $(date) ==="
         
         if [ -d "$dir" ]; then
+            file_count=$(find "$dir" -type f -not -path "$dir/quarantine/*" | wc -l)
+            echo "Found $file_count files to scan"
+            
             find "$dir" -type f -not -path "$dir/quarantine/*" | while read -r file; do
                 echo "Checking: $file"
                 # Mock scan result
                 if [[ "$file" == *"test"* ]]; then
-                    echo "MALICIOUS FILE DETECTED: $file"
+                    echo "🚨 MALICIOUS FILE DETECTED: $file"
                     if [ "$ACTION" = "quarantine" ]; then
                         mv "$file" "$dir/quarantine/"
-                        echo "Quarantined: $file"
+                        echo "✅ Quarantined: $file"
                     elif [ "$ACTION" = "delete" ]; then
                         rm "$file"
-                        echo "Deleted: $file"
+                        echo "🗑️  Deleted: $file"
+                    else
+                        echo "📝 Reported: $file"
                     fi
                 else
-                    echo "Clean: $file"
+                    echo "✅ Clean: $file"
                 fi
             done
         else
-            echo "WARNING: Directory $dir not found"
+            echo "❌ WARNING: Directory $dir not found"
         fi
         
         echo "Waiting ${interval} seconds..."
