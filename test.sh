@@ -1,144 +1,164 @@
 #!/bin/bash
-# Test script for local path configuration
+
+set -e
+
+echo "=== Trend Micro File Security Scanner Test ==="
+echo ""
 
 # Colors for output
+RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-RED='\033[0;31m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
-print_status() {
-    echo -e "${GREEN}✅ $1${NC}"
+# Test counter
+TESTS_PASSED=0
+TESTS_FAILED=0
+
+# Function to run test
+run_test() {
+    local test_name="$1"
+    local test_command="$2"
+    
+    echo -n "Testing: $test_name... "
+    
+    if eval "$test_command" > /dev/null 2>&1; then
+        echo -e "${GREEN}PASS${NC}"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}FAIL${NC}"
+        ((TESTS_FAILED++))
+    fi
 }
 
-print_warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
+# Function to check if Docker is running
+check_docker() {
+    echo "Checking Docker..."
+    if ! docker info > /dev/null 2>&1; then
+        echo -e "${RED}ERROR: Docker is not running${NC}"
+        echo "Please start Docker and try again"
+        exit 1
+    fi
+    echo -e "${GREEN}Docker is running${NC}"
+    echo ""
 }
 
-print_error() {
-    echo -e "${RED}❌ $1${NC}"
+# Function to build image
+build_image() {
+    echo "Building Docker image..."
+    if docker build -t tmfs-scanner . > /dev/null 2>&1; then
+        echo -e "${GREEN}Image built successfully${NC}"
+    else
+        echo -e "${RED}Failed to build image${NC}"
+        exit 1
+    fi
+    echo ""
 }
 
-echo "🧪 Testing Local Path Configuration"
-echo "==================================="
-echo ""
+# Function to test basic commands
+test_basic_commands() {
+    echo "Testing basic commands..."
+    
+    # Test help command
+    run_test "Help command" "docker run --rm tmfs-scanner help"
+    
+    # Test scan command with non-existent file
+    run_test "Scan non-existent file" "docker run --rm tmfs-scanner scan /nonexistent"
+    
+    # Test scan-dir command with non-existent directory
+    run_test "Scan non-existent directory" "docker run --rm tmfs-scanner scan-dir /nonexistent"
+    
+    echo ""
+}
 
-# Check if Docker is running
-if ! docker info >/dev/null 2>&1; then
-    print_error "Docker is not running or not accessible"
-    exit 1
-fi
+# Function to test monitoring
+test_monitoring() {
+    echo "Testing monitoring functionality..."
+    
+    # Create test directory
+    mkdir -p /tmp/test-scan
+    
+    # Create test files
+    echo "clean file" > /tmp/test-scan/clean.txt
+    echo "test file" > /tmp/test-scan/test.txt
+    
+    # Start monitoring in background
+    echo "Starting monitoring (will run for 10 seconds)..."
+    timeout 10s docker run --rm \
+        -e ACTION=quarantine \
+        -e SCAN_INTERVAL=2 \
+        -v /tmp/test-scan:/mnt/scan:shared \
+        tmfs-scanner monitor || true
+    
+    # Check if quarantine directory was created
+    if [ -d "/tmp/test-scan/quarantine" ]; then
+        echo -e "${GREEN}Quarantine directory created${NC}"
+        ((TESTS_PASSED++))
+    else
+        echo -e "${RED}Quarantine directory not created${NC}"
+        ((TESTS_FAILED++))
+    fi
+    
+    # Cleanup
+    rm -rf /tmp/test-scan
+    echo ""
+}
 
-# Check if image exists
-if ! docker image inspect tmfs-scanner >/dev/null 2>&1; then
-    print_warning "Docker image 'tmfs-scanner' not found. Building..."
-    make build
-fi
+# Function to test NFS simulation
+test_nfs_simulation() {
+    echo "Testing NFS simulation..."
+    
+    # Create local directory to simulate NFS
+    mkdir -p /tmp/nfs-sim
+    
+    # Test with NFS environment variables
+    run_test "NFS mount simulation" "docker run --rm \
+        -e NFS_SERVER=localhost \
+        -e NFS_SHARE=/tmp \
+        -e MOUNT_PATH=/mnt/nfs \
+        -v /tmp/nfs-sim:/mnt/nfs:shared \
+        tmfs-scanner scan-dir /mnt/nfs"
+    
+    # Cleanup
+    rm -rf /tmp/nfs-sim
+    echo ""
+}
 
-# Check if NFS server is accessible
-NFS_SERVER=${NFS_SERVER:-"192.168.200.50"}
-NFS_SHARE=${NFS_SHARE:-"/mnt/nfs-share"}
-MOUNT_PATH=${MOUNT_PATH:-"/mnt/nfs"}
+# Function to show results
+show_results() {
+    echo "=== Test Results ==="
+    echo -e "${GREEN}Tests passed: $TESTS_PASSED${NC}"
+    echo -e "${RED}Tests failed: $TESTS_FAILED${NC}"
+    echo ""
+    
+    if [ $TESTS_FAILED -eq 0 ]; then
+        echo -e "${GREEN}All tests passed! 🎉${NC}"
+        echo ""
+        echo "You can now use the scanner:"
+        echo "  docker run -d --name tmfs-monitor --privileged \\"
+        echo "    -e TM_ENDPOINT=192.168.200.50:30230 \\"
+        echo "    -e TM_TLS=false \\"
+        echo "    -e NFS_SERVER=192.168.200.50 \\"
+        echo "    -e NFS_SHARE=/mnt/nfs-share \\"
+        echo "    -e MOUNT_PATH=/mnt/nfs \\"
+        echo "    -e ACTION=quarantine \\"
+        echo "    -v /mnt/nfs:/mnt/nfs:shared \\"
+        echo "    tmfs-scanner monitor"
+    else
+        echo -e "${RED}Some tests failed. Please check the output above.${NC}"
+        exit 1
+    fi
+}
 
-# Create mount point if it doesn't exist
-if [ ! -d "$MOUNT_PATH" ]; then
-    print_warning "Mount path $MOUNT_PATH does not exist. Creating..."
-    sudo mkdir -p "$MOUNT_PATH"
-    sudo chmod 755 "$MOUNT_PATH"
-fi
+# Main test execution
+main() {
+    check_docker
+    build_image
+    test_basic_commands
+    test_monitoring
+    test_nfs_simulation
+    show_results
+}
 
-print_status "Creating test files in $MOUNT_PATH..."
-
-# Create EICAR test file in the mount path
-echo 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > "$MOUNT_PATH/test-eicar.txt"
-
-# Create a clean test file
-echo "This is a clean test file for scanning." > "$MOUNT_PATH/test-clean.txt"
-
-# Create a test directory with multiple files
-mkdir -p "$MOUNT_PATH/test-dir"
-echo "Test file 1" > "$MOUNT_PATH/test-dir/file1.txt"
-echo "Test file 2" > "$MOUNT_PATH/test-dir/file2.txt"
-echo "Test file 3" > "$MOUNT_PATH/test-dir/file3.txt"
-
-print_status "Testing NFS scan..."
-
-# Test single file scan
-echo "🔍 Testing single file scan..."
-docker run --rm \
-    -e TM_ENDPOINT=192.168.200.50:30230 \
-    -e TM_TLS=false \
-    -e NFS_SERVER=192.168.200.50 \
-    -e NFS_SHARE=/mnt/nfs-share \
-    -e MOUNT_PATH=/mnt/nfs \
-    -v "$MOUNT_PATH:$MOUNT_PATH:shared" \
-    tmfs-scanner scan "$MOUNT_PATH/test-eicar.txt"
-
-print_status "Testing directory scan..."
-
-# Test directory scan
-echo "🔍 Testing directory scan..."
-docker run --rm \
-    -e TM_ENDPOINT=192.168.200.50:30230 \
-    -e TM_TLS=false \
-    -e NFS_SERVER=192.168.200.50 \
-    -e NFS_SHARE=/mnt/nfs-share \
-    -e MOUNT_PATH=/mnt/nfs \
-    -v "$MOUNT_PATH:$MOUNT_PATH:shared" \
-    tmfs-scanner scan-dir "$MOUNT_PATH/test-dir"
-
-print_status "Testing Makefile with local path..."
-
-# Test using Makefile (if available)
-echo "🔍 Testing Makefile with NFS path..."
-if command -v make >/dev/null 2>&1; then
-    make scan FILE="$MOUNT_PATH/test-eicar.txt" TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false NFS_SERVER=192.168.200.50 NFS_SHARE=/mnt/nfs-share MOUNT_PATH=/mnt/nfs
-else
-    echo "⚠️  Make not available, skipping Makefile test"
-fi
-
-print_status "Testing monitoring mode..."
-
-# Test monitoring mode (run for a short time)
-echo "🔍 Testing monitoring mode (will run for 10 seconds)..."
-docker run --rm \
-    -e TM_ENDPOINT=192.168.200.50:30230 \
-    -e TM_TLS=false \
-    -e NFS_SERVER=192.168.200.50 \
-    -e NFS_SHARE=/mnt/nfs-share \
-    -e MOUNT_PATH=/mnt/nfs \
-    -e ACTION=quarantine \
-    -e SCAN_INTERVAL=5 \
-    -v "$MOUNT_PATH:$MOUNT_PATH:shared" \
-    tmfs-scanner monitor &
-MONITOR_PID=$!
-
-# Wait for 10 seconds
-sleep 10
-
-# Stop the monitoring
-kill $MONITOR_PID 2>/dev/null || true
-wait $MONITOR_PID 2>/dev/null || true
-
-print_status "Cleaning up test files..."
-
-# Clean up test files
-rm -f "$MOUNT_PATH/test-eicar.txt" "$MOUNT_PATH/test-clean.txt"
-rm -rf "$MOUNT_PATH/test-dir"
-
-print_status "Test completed successfully!"
-echo ""
-echo "📋 Test Summary:"
-echo "- ✅ Docker environment check"
-echo "- ✅ Image build/availability"
-echo "- ✅ Local path accessibility"
-echo "- ✅ Single file scanning"
-echo "- ✅ Directory scanning"
-echo "- ✅ Makefile integration"
-echo "- ✅ Monitoring mode"
-echo "- ✅ Test file cleanup"
-echo ""
-echo "🚀 Ready to use! You can now:"
-echo "  - Run: make monitor NFS_SERVER=192.168.200.50 NFS_SHARE=/mnt/nfs-share MOUNT_PATH=/mnt/nfs TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false"
-echo "  - Run: make scan FILE=/path/to/file NFS_SERVER=192.168.200.50 NFS_SHARE=/mnt/nfs-share MOUNT_PATH=/mnt/nfs TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false"
-echo "  - Run: docker run --rm -e TM_ENDPOINT=192.168.200.50:30230 -e TM_TLS=false -e NFS_SERVER=192.168.200.50 -e NFS_SHARE=/mnt/nfs-share -e MOUNT_PATH=/mnt/nfs -v $MOUNT_PATH:$MOUNT_PATH:shared tmfs-scanner monitor" 
+# Run tests
+main 

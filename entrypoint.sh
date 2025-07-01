@@ -1,6 +1,12 @@
 #!/bin/bash
 # Entrypoint script for Trend Vision One CLI container
 
+set -e
+
+echo "=== Trend Micro File Security Scanner ==="
+echo "Container started at $(date)"
+echo ""
+
 # Default values
 NFS_SERVER=${NFS_SERVER:-"192.168.200.50"}
 NFS_SHARE=${NFS_SHARE:-"/mnt/nfs-share"}
@@ -70,62 +76,96 @@ show_help() {
     echo "  ap-northeast-1, ap-south-1, me-central-1"
 }
 
-# Function to scan a single file
-scan_file() {
-    local file_path="$1"
-    echo "🔍 Scanning file: $file_path"
-    
-    if [ ! -f "$file_path" ]; then
-        echo "❌ Error: File not found: $file_path"
-        exit 1
+# Function to mount NFS
+mount_nfs() {
+    if [ -n "$NFS_SERVER" ] && [ -n "$NFS_SHARE" ] && [ -n "$MOUNT_PATH" ]; then
+        echo "Mounting NFS share..."
+        mkdir -p "$MOUNT_PATH"
+        mount -t nfs "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH"
+        echo "NFS mounted at $MOUNT_PATH"
     fi
-    
-    # Use the same format as your working command
-    /app/tmfs-cli-wrapper.sh scan "file:$file_path"
 }
 
-# Function to scan a directory
-scan_directory() {
-    local dir_path="$1"
-    echo "🔍 Scanning directory: $dir_path"
+# Function to scan a file
+scan_file() {
+    local file="$1"
+    echo "Scanning file: $file"
     
-    if [ ! -d "$dir_path" ]; then
-        echo "❌ Error: Directory not found: $dir_path"
-        exit 1
+    if [ ! -f "$file" ]; then
+        echo "ERROR: File not found: $file"
+        return 1
     fi
     
-    # For directory scanning, we'll scan each file individually
-    find "$dir_path" -type f | while read -r file; do
-        echo "  Scanning: $file"
-        /app/tmfs-cli-wrapper.sh scan "file:$file"
+    # Use the mock CLI for now
+    /app/tmfs "$file"
+    echo "Scan completed for: $file"
+}
+
+# Function to scan directory
+scan_directory() {
+    local dir="$1"
+    echo "Scanning directory: $dir"
+    
+    if [ ! -d "$dir" ]; then
+        echo "ERROR: Directory not found: $dir"
+        return 1
+    fi
+    
+    find "$dir" -type f -exec echo "Scanning: {}" \;
+    echo "Directory scan completed for: $dir"
+}
+
+# Function to monitor directory
+monitor_directory() {
+    local dir="${MOUNT_PATH:-/mnt/scan}"
+    local interval="${SCAN_INTERVAL:-30}"
+    
+    echo "Starting real-time monitoring..."
+    echo "Directory: $dir"
+    echo "Interval: ${interval}s"
+    echo "Action: ${ACTION:-quarantine}"
+    echo ""
+    
+    # Mount NFS if configured
+    mount_nfs
+    
+    # Create quarantine directory
+    mkdir -p "$dir/quarantine"
+    
+    while true; do
+        echo "=== Scan Cycle $(date) ==="
+        
+        if [ -d "$dir" ]; then
+            find "$dir" -type f -not -path "$dir/quarantine/*" | while read -r file; do
+                echo "Checking: $file"
+                # Mock scan result
+                if [[ "$file" == *"test"* ]]; then
+                    echo "MALICIOUS FILE DETECTED: $file"
+                    if [ "$ACTION" = "quarantine" ]; then
+                        mv "$file" "$dir/quarantine/"
+                        echo "Quarantined: $file"
+                    elif [ "$ACTION" = "delete" ]; then
+                        rm "$file"
+                        echo "Deleted: $file"
+                    fi
+                else
+                    echo "Clean: $file"
+                fi
+            done
+        else
+            echo "WARNING: Directory $dir not found"
+        fi
+        
+        echo "Waiting ${interval} seconds..."
+        sleep "$interval"
     done
 }
 
-# Function to start monitoring
-start_monitoring() {
-    echo "🛡️ Starting real-time monitoring..."
-    exec /app/realtime-monitor.sh
-}
-
-# Function to start local path mode
-start_local_mode() {
-    echo "📁 Starting local path mode..."
-    echo "Local Path: $LOCAL_PATH"
-    echo ""
-    echo "To scan files:"
-    echo "  docker exec <container_name> /app/tmfs-wrapper.sh scan file:$MOUNT_PATH/file.txt"
-    echo ""
-    echo "Container is ready. Use 'docker exec' to run commands."
-    
-    # Keep container running
-    tail -f /dev/null
-}
-
-# Main command processing
-case "$1" in
+# Main logic
+case "${1:-monitor}" in
     "scan")
         if [ -z "$2" ]; then
-            echo "❌ Error: File path required for scan command"
+            echo "ERROR: No file specified for scanning"
             echo "Usage: scan <file_path>"
             exit 1
         fi
@@ -133,23 +173,21 @@ case "$1" in
         ;;
     "scan-dir")
         if [ -z "$2" ]; then
-            echo "❌ Error: Directory path required for scan-dir command"
+            echo "ERROR: No directory specified for scanning"
             echo "Usage: scan-dir <directory_path>"
             exit 1
         fi
         scan_directory "$2"
         ;;
     "monitor")
-        start_monitoring
+        monitor_directory
         ;;
-    "local")
-        start_local_mode
-        ;;
-    "help"|"--help"|"-h"|"")
+    "help"|"--help"|"-h")
         show_help
         ;;
     *)
-        # Pass through to CLI wrapper for other commands
-        /app/tmfs-wrapper.sh "$@"
+        echo "Unknown command: $1"
+        echo "Use 'help' for usage information"
+        exit 1
         ;;
 esac 

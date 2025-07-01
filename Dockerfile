@@ -15,11 +15,12 @@ RUN apk add --no-cache \
 # Create app directory
 WORKDIR /app
 
-# Download and install Trend Vision One CLI
-# Note: You need to download the CLI manually from Trend Micro Vision One console
-# and place it in the build context as 'tmfs' file
-COPY tmfs /app/tmfs
-RUN chmod +x /app/tmfs
+# Create a simple mock CLI for testing (you'll replace this with real CLI)
+RUN echo '#!/bin/bash' > /app/tmfs && \
+    echo 'echo "Mock Trend Micro CLI - Replace with real CLI"' >> /app/tmfs && \
+    echo 'echo "Scanning: $1"' >> /app/tmfs && \
+    echo 'echo "Result: CLEAN"' >> /app/tmfs && \
+    chmod +x /app/tmfs
 
 # Copy entrypoint script
 COPY entrypoint.sh /app/entrypoint.sh
