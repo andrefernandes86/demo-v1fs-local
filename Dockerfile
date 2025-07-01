@@ -1,4 +1,4 @@
-# Use official Go image as base
+# Use official Go image as base for building tmfs
 FROM golang:1.23-alpine AS builder
 
 # Install build dependencies
@@ -20,48 +20,49 @@ RUN make build && \
 # Create final runtime image
 FROM alpine:latest
 
-# Install runtime dependencies for NFS support
+# Install required packages
 RUN apk add --no-cache \
+    curl \
+    wget \
+    unzip \
+    bash \
     nfs-utils \
     rpcbind \
     ca-certificates \
+    jq \
     && rm -rf /var/cache/apk/*
 
 # Create non-root user for security
 RUN addgroup -g 1000 tmfs && \
-    adduser -D -s /bin/sh -u 1000 -G tmfs tmfs
+    adduser -D -s /bin/bash -u 1000 -G tmfs tmfs
 
 # Set working directory
 WORKDIR /app
 
-# Copy built binaries from builder stage
+# Use the existing tmfs binary from the Go SDK build
+# This is the same binary that works with your local endpoint
 COPY --from=builder /app/examples/client/client /app/tmfs
-COPY --from=builder /app/examples/scanfiles/scanfiles /app/scanfiles
-
-# Make binaries executable and set proper ownership
-RUN chmod +x /app/tmfs /app/scanfiles && \
-    chown tmfs:tmfs /app/tmfs /app/scanfiles && \
-    ls -la /app/tmfs /app/scanfiles
+RUN chmod +x /app/tmfs
 
 # Create mount points for NFS shares and files
 RUN mkdir -p /mnt/nfs /app/files && chown tmfs:tmfs /mnt/nfs /app/files
 
 # Copy wrapper and entrypoint scripts
-COPY tmfs-wrapper.sh /app/tmfs-wrapper.sh
-COPY entrypoint.sh /app/entrypoint.sh
-COPY realtime-monitor.sh /app/realtime-monitor.sh
-RUN chmod +x /app/tmfs-wrapper.sh /app/entrypoint.sh /app/realtime-monitor.sh && \
-    chown tmfs:tmfs /app/tmfs-wrapper.sh /app/entrypoint.sh /app/realtime-monitor.sh
-
-# Keep as root for NFS operations, but switch to tmfs for other operations
-# USER tmfs
+COPY tmfs-cli-wrapper.sh /app/tmfs-cli-wrapper.sh
+COPY entrypoint-cli.sh /app/entrypoint-cli.sh
+COPY realtime-monitor-cli.sh /app/realtime-monitor-cli.sh
+RUN chmod +x /app/tmfs-cli-wrapper.sh /app/entrypoint-cli.sh /app/realtime-monitor-cli.sh && \
+    chown tmfs:tmfs /app/tmfs-cli-wrapper.sh /app/entrypoint-cli.sh /app/realtime-monitor-cli.sh
 
 # Set default environment variables
-ENV TM_AM_SCAN_TIMEOUT_SECS=300
-ENV TM_AM_DISABLE_CERT_VERIFY=0
+ENV TM_API_KEY=""
+ENV TM_REGION="us-east-1"
+ENV TM_ENDPOINT="my-release-visionone-filesecurity-scanner:50051"
+ENV TM_TLS="false"
+ENV TM_TIMEOUT="300"
 
 # Set entrypoint
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint-cli.sh"]
 
 # Default command
 CMD ["help"] 

@@ -1,176 +1,186 @@
-# Makefile for Trend Vision One File Security Docker Container
+# Makefile for Trend Vision One CLI File Security Scanner
 
-.PHONY: help build test run clean scan scanfiles nfs
+# Default values
+DOCKER_IMAGE = tmfs-scanner
+DOCKER_COMPOSE_FILE = docker-compose.yml
+ENV_FILE = .env
 
-# Default target
-help:
-	@echo "Trend Vision One File Security Docker Container"
-	@echo "=============================================="
+# Colors for output
+GREEN = \033[0;32m
+YELLOW = \033[1;33m
+RED = \033[0;31m
+NC = \033[0m
+
+.PHONY: help build build-no-cache clean run scan scan-dir monitor nfs stop logs status test
+
+help: ## Show this help message
+	@echo "$(GREEN)🛡️ Trend Vision One CLI File Security Scanner$(NC)"
+	@echo "============================================="
 	@echo ""
-	@echo "Available targets:"
-	@echo "  build     - Build the Docker container"
-	@echo "  test      - Run tests to verify the container"
-	@echo "  run       - Run the container with NFS support"
-	@echo "  scan      - Scan a single file (usage: make scan FILE=path/to/file)"
-	@echo "  scanfiles - Scan multiple files (usage: make scanfiles PATH=/path/to/files)"
-	@echo "  monitor   - Start real-time monitoring with quarantine action"
-	@echo "  monitor-delete - Start real-time monitoring with delete action"
-	@echo "  monitor-report - Start real-time monitoring with report only"
-	@echo "  clean     - Clean up containers and images"
-	@echo "  help      - Show this help message"
-	@echo ""
-	@echo "Environment variables:"
-	@echo "  ENDPOINT  - File Security service endpoint (default: localhost:50051)"
-	@echo "  TLS       - Enable/disable TLS (default: true)"
-	@echo "  APIKEY    - API key for authentication"
-	@echo "  REGION    - Service region"
-	@echo ""
+	@echo "Available commands:"
+	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  $(YELLOW)%-15s$(NC) %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-# Build the container
-build:
-	@echo "Building Docker container..."
-	docker build -t tmfs-scanner .
-	@echo "✅ Container built successfully"
+build: ## Build the CLI scanner container
+	@echo "$(GREEN)🔨 Building CLI scanner container...$(NC)"
+	docker build -t $(DOCKER_IMAGE) .
 
-# Run tests
-test:
-	@echo "Running tests..."
-	./test.sh
+build-no-cache: ## Build the CLI scanner container without cache
+	@echo "$(GREEN)🔨 Building CLI scanner container (no cache)...$(NC)"
+	docker build --no-cache -t $(DOCKER_IMAGE) .
 
-# Run container with NFS support
-run:
-	@echo "Starting container with NFS support..."
-	docker run -d \
-		--name tmfs-scanner \
-		--privileged \
-		-e ENDPOINT=$(ENDPOINT:-localhost:50051) \
-		-e TLS=$(TLS:-true) \
-		-e APIKEY=$(APIKEY) \
-		-e REGION=$(REGION) \
-		-v nfs-share:/mnt/nfs:shared \
-		tmfs-scanner nfs
-	@echo "✅ Container started. Use 'docker exec tmfs-scanner' to run commands"
+clean: ## Remove containers and images
+	@echo "$(YELLOW)🧹 Cleaning up containers and images...$(NC)"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) down --rmi all
+	docker rmi $(DOCKER_IMAGE) 2>/dev/null || true
 
-# Scan a single file
-scan:
+run: ## Start the monitoring service
+	@echo "$(GREEN)🚀 Starting CLI scanner monitoring service...$(NC)"
+	@if [ ! -f $(ENV_FILE) ]; then \
+		echo "$(RED)❌ Error: $(ENV_FILE) file not found. Please create it with your TM_API_KEY.$(NC)"; \
+		exit 1; \
+	fi
+	docker-compose -f $(DOCKER_COMPOSE_FILE) up -d
+
+scan: ## Scan a single file (usage: make scan FILE=/path/to/file)
+	@echo "$(GREEN)🔍 Scanning file: $(FILE)$(NC)"
 	@if [ -z "$(FILE)" ]; then \
-		echo "❌ Error: FILE parameter is required"; \
-		echo "Usage: make scan FILE=path/to/file [ENDPOINT=host:port] [TLS=false]"; \
+		echo "$(RED)❌ Error: FILE parameter required. Usage: make scan FILE=/path/to/file$(NC)"; \
 		exit 1; \
 	fi
-	@echo "Scanning file: $(FILE)"
-	docker run --rm \
-		-e ENDPOINT=$(ENDPOINT:-localhost:50051) \
-		-e TLS=$(TLS:-true) \
-		-e APIKEY=$(APIKEY) \
-		-e REGION=$(REGION) \
-		-e PML=$(PML:-false) \
-		-e VERBOSE=$(VERBOSE:-false) \
-		-v $(shell dirname $(FILE)):/app/files:ro \
-		tmfs-scanner scan file:/app/files/$(shell basename $(FILE))
-
-# Scan multiple files
-scanfiles:
-	@if [ -z "$(PATH)" ]; then \
-		echo "❌ Error: PATH parameter is required"; \
-		echo "Usage: make scanfiles PATH=/path/to/files [ENDPOINT=host:port] [TLS=false]"; \
+	@if [ ! -f $(ENV_FILE) ] && [ -z "$(TM_ENDPOINT)" ] && [ -z "$(TM_API_KEY)" ]; then \
+		echo "$(RED)❌ Error: Either $(ENV_FILE) file, TM_ENDPOINT (local), or TM_API_KEY (cloud) is required.$(NC)"; \
+		echo "$(YELLOW)Examples:$(NC)"; \
+		echo "$(YELLOW)  make scan FILE=/path/to/file TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false$(NC)"; \
+		echo "$(YELLOW)  make scan FILE=/path/to/file --env-file .env$(NC)"; \
 		exit 1; \
 	fi
-	@echo "Scanning files in: $(PATH)"
 	docker run --rm \
-		-e ENDPOINT=$(ENDPOINT:-localhost:50051) \
-		-e TLS=$(TLS:-true) \
-		-e APIKEY=$(APIKEY) \
-		-e REGION=$(REGION) \
-		-e PML=$(PML:-false) \
-		-e VERBOSE=$(VERBOSE:-false) \
-		-v $(PATH):/app/files:ro \
-		tmfs-scanner scanfiles -path=/app/files
+		$(if $(TM_ENDPOINT),-e TM_ENDPOINT=$(TM_ENDPOINT),) \
+		$(if $(TM_API_KEY),-e TM_API_KEY=$(TM_API_KEY),) \
+		$(if $(TM_TLS),-e TM_TLS=$(TM_TLS),-e TM_TLS=false) \
+		$(if $(TM_REGION),-e TM_REGION=$(TM_REGION),) \
+		$(if $(ENV_FILE),--env-file $(ENV_FILE),) \
+		-v $(FILE):/app/file:ro \
+		$(DOCKER_IMAGE) scan /app/file
 
-# Clean up containers and images
-clean:
-	@echo "Cleaning up..."
-	@docker stop tmfs-scanner 2>/dev/null || true
-	@docker rm tmfs-scanner 2>/dev/null || true
-	@docker rmi tmfs-scanner 2>/dev/null || true
-	@docker volume rm nfs-share 2>/dev/null || true
-	@echo "✅ Cleanup completed"
+scan-dir: ## Scan a directory (usage: make scan-dir DIR=/path/to/directory)
+	@echo "$(GREEN)🔍 Scanning directory: $(DIR)$(NC)"
+	@if [ -z "$(DIR)" ]; then \
+		echo "$(RED)❌ Error: DIR parameter required. Usage: make scan-dir DIR=/path/to/directory$(NC)"; \
+		exit 1; \
+	fi
+	@if [ ! -f $(ENV_FILE) ] && [ -z "$(TM_ENDPOINT)" ]; then \
+		echo "$(RED)❌ Error: Either $(ENV_FILE) file or TM_ENDPOINT environment variable is required.$(NC)"; \
+		exit 1; \
+	fi
+	docker run --rm \
+		$(if $(TM_ENDPOINT),-e TM_ENDPOINT=$(TM_ENDPOINT),--env-file $(ENV_FILE)) \
+		$(if $(TM_TLS),-e TM_TLS=$(TM_TLS),-e TM_TLS=false) \
+		-v $(DIR):/app/dir:ro \
+		$(DOCKER_IMAGE) scan-dir /app/dir
 
-# Example usage
-example:
-	@echo "Creating example EICAR test file..."
-	@mkdir -p files
-	@echo 'X5O!P%@AP[4\PZX54(P^)7CC)7}$$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$$H+H*' > files/eicar.com.txt
-	@echo "✅ Example file created: files/eicar.com.txt"
+monitor: ## Start real-time monitoring
+	@echo "$(GREEN)🛡️ Starting real-time monitoring...$(NC)"
+	@if [ ! -f $(ENV_FILE) ] && [ -z "$(TM_ENDPOINT)" ]; then \
+		echo "$(RED)❌ Error: Either $(ENV_FILE) file or TM_ENDPOINT environment variable is required.$(NC)"; \
+		exit 1; \
+	fi
+	docker run -d \
+		--name tmfs-cli-monitor \
+		--privileged \
+		$(if $(TM_ENDPOINT),-e TM_ENDPOINT=$(TM_ENDPOINT),--env-file $(ENV_FILE)) \
+		$(if $(TM_TLS),-e TM_TLS=$(TM_TLS),-e TM_TLS=false) \
+		$(if $(LOCAL_PATH),-e LOCAL_PATH=$(LOCAL_PATH),-e LOCAL_PATH=/mnt/nfs-share) \
+		$(if $(LOCAL_PATH),-v $(LOCAL_PATH):$(LOCAL_PATH):shared,-v nfs-share:/mnt/nfs:shared) \
+		$(DOCKER_IMAGE) monitor
+
+local: ## Start local path support mode
+	@echo "$(GREEN)📁 Starting local path support mode...$(NC)"
+	@if [ ! -f $(ENV_FILE) ] && [ -z "$(TM_ENDPOINT)" ]; then \
+		echo "$(RED)❌ Error: Either $(ENV_FILE) file or TM_ENDPOINT environment variable is required.$(NC)"; \
+		exit 1; \
+	fi
+	docker run -d \
+		--name tmfs-cli-local \
+		--privileged \
+		$(if $(TM_ENDPOINT),-e TM_ENDPOINT=$(TM_ENDPOINT),--env-file $(ENV_FILE)) \
+		$(if $(TM_TLS),-e TM_TLS=$(TM_TLS),-e TM_TLS=false) \
+		$(if $(LOCAL_PATH),-e LOCAL_PATH=$(LOCAL_PATH),-e LOCAL_PATH=/mnt/nfs-share) \
+		$(if $(LOCAL_PATH),-v $(LOCAL_PATH):$(LOCAL_PATH):shared,) \
+		$(DOCKER_IMAGE) local
+
+stop: ## Stop all containers
+	@echo "$(YELLOW)🛑 Stopping all containers...$(NC)"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) down
+	docker stop tmfs-cli-monitor tmfs-cli-local 2>/dev/null || true
+	docker rm tmfs-cli-monitor tmfs-cli-local 2>/dev/null || true
+
+logs: ## Show container logs
+	@echo "$(GREEN)📋 Showing container logs...$(NC)"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) logs -f
+
+status: ## Show container status
+	@echo "$(GREEN)📊 Container status:$(NC)"
+	docker-compose -f $(DOCKER_COMPOSE_FILE) ps
 	@echo ""
-	@echo "To scan the example file:"
-	@echo "  make scan FILE=files/eicar.com.txt ENDPOINT=your-endpoint:50051 TLS=false"
+	@echo "$(GREEN)📊 Running containers:$(NC)"
+	docker ps --filter "name=tmfs-cli"
 
-# NFS examples
-nfs-test:
-	@echo "Testing NFS connectivity to 192.168.200.10/mnt/nfs_share..."
-	./test-nfs-connectivity.sh
+test: ## Test the CLI scanner with a sample file
+	@echo "$(GREEN)🧪 Testing CLI scanner...$(NC)"
+	@if [ ! -f $(ENV_FILE) ] && [ -z "$(TM_ENDPOINT)" ]; then \
+		echo "$(RED)❌ Error: Either $(ENV_FILE) file or TM_ENDPOINT environment variable is required.$(NC)"; \
+		exit 1; \
+	fi
+	@echo "Creating test file..."
+	@echo 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > test-eicar.txt
+	@echo "Scanning test file..."
+	@docker run --rm \
+		$(if $(TM_ENDPOINT),-e TM_ENDPOINT=$(TM_ENDPOINT),--env-file $(ENV_FILE)) \
+		$(if $(TM_TLS),-e TM_TLS=$(TM_TLS),-e TM_TLS=false) \
+		-v $(PWD)/test-eicar.txt:/app/test-eicar.txt:ro \
+		$(DOCKER_IMAGE) scan /app/test-eicar.txt
+	@echo "Cleaning up test file..."
+	@rm -f test-eicar.txt
 
-nfs-scan:
-	@echo "Starting interactive NFS scanning..."
-	./example-nfs-scan.sh
+test-local: ## Test with local endpoint configuration
+	@echo "$(GREEN)🧪 Testing local endpoint configuration...$(NC)"
+	@./test.sh
 
-nfs-quick:
-	@echo "Quick NFS scan example:"
-	@echo "1. Start container: docker run -d --name tmfs-nfs --privileged tmfs-scanner nfs"
-	@echo "2. Mount NFS: docker exec tmfs-nfs mount -t nfs 192.168.200.10:/mnt/nfs_share /mnt/nfs"
-	@echo "3. Scan files: docker exec tmfs-nfs /app/tmfs scan file:/mnt/nfs/filename.txt --tls=false --addr=192.168.200.50:50051"
-	@echo "4. Cleanup: docker stop tmfs-nfs && docker rm tmfs-nfs"
+setup: ## Initial setup - create .env file template
+	@echo "$(GREEN)⚙️ Creating .env file template...$(NC)"
+	@if [ -f $(ENV_FILE) ]; then \
+		echo "$(YELLOW)⚠️ $(ENV_FILE) already exists. Skipping...$(NC)"; \
+	else \
+		echo "# Trend Vision One CLI Configuration" > $(ENV_FILE); \
+		echo "" >> $(ENV_FILE); \
+		echo "# Required: Your Trend Vision One API Key" >> $(ENV_FILE); \
+		echo "TM_API_KEY=your-api-key-here" >> $(ENV_FILE); \
+		echo "" >> $(ENV_FILE); \
+		echo "# Optional: Vision One Configuration" >> $(ENV_FILE); \
+		echo "TM_REGION=us-east-1" >> $(ENV_FILE); \
+		echo "TM_ENDPOINT=" >> $(ENV_FILE); \
+		echo "TM_TLS=true" >> $(ENV_FILE); \
+		echo "TM_TIMEOUT=300" >> $(ENV_FILE); \
+		echo "" >> $(ENV_FILE); \
+		echo "# NFS Configuration (if using NFS)" >> $(ENV_FILE); \
+		echo "NFS_SERVER=192.168.200.10" >> $(ENV_FILE); \
+		echo "NFS_SHARE=/mnt/nfs_share" >> $(ENV_FILE); \
+		echo "" >> $(ENV_FILE); \
+		echo "# Monitoring Configuration" >> $(ENV_FILE); \
+		echo "ACTION=quarantine" >> $(ENV_FILE); \
+		echo "SCAN_INTERVAL=30" >> $(ENV_FILE); \
+		echo "QUARANTINE_DIR=quarantine" >> $(ENV_FILE); \
+		echo "$(GREEN)✅ Created $(ENV_FILE) template. Please edit it with your API key.$(NC)"; \
+	fi
 
-# Real-time monitoring with action parameters
-monitor:
-	@echo "Starting real-time monitoring with quarantine action..."
-	docker run -d \
-		--name tmfs-monitor \
-		--privileged \
-		--network host \
-		-e ENDPOINT=192.168.200.50:50051 \
-		-e TLS=false \
-		-e NFS_SERVER=192.168.200.10 \
-		-e NFS_SHARE=/mnt/nfs_share \
-		-e ACTION=quarantine \
-		-e SCAN_INTERVAL=30 \
-		-e QUARANTINE_DIR=quarantine \
-		tmfs-scanner:latest \
-		monitor
-	@echo "✅ Quarantine monitoring started. Check logs with: docker logs tmfs-monitor"
-
-monitor-delete:
-	@echo "Starting real-time monitoring with delete action..."
-	docker run -d \
-		--name tmfs-monitor-delete \
-		--privileged \
-		--network host \
-		-e ENDPOINT=192.168.200.50:50051 \
-		-e TLS=false \
-		-e NFS_SERVER=192.168.200.10 \
-		-e NFS_SHARE=/mnt/nfs_share \
-		-e ACTION=delete \
-		-e SCAN_INTERVAL=30 \
-		tmfs-scanner:latest \
-		monitor
-	@echo "✅ Delete monitoring started. Check logs with: docker logs tmfs-monitor-delete"
-
-monitor-report:
-	@echo "Starting real-time monitoring with report only..."
-	docker run -d \
-		--name tmfs-monitor-report \
-		--privileged \
-		--network host \
-		-e ENDPOINT=192.168.200.50:50051 \
-		-e TLS=false \
-		-e NFS_SERVER=192.168.200.10 \
-		-e NFS_SHARE=/mnt/nfs_share \
-		-e ACTION=report_only \
-		-e SCAN_INTERVAL=30 \
-		tmfs-scanner:latest \
-		monitor
-	@echo "✅ Report-only monitoring started. Check logs with: docker logs tmfs-monitor-report"
-
-# Legacy commands for backward compatibility
-auto-delete: monitor-delete 
+version: ## Show version information
+	@echo "$(GREEN)📋 Version Information:$(NC)"
+	@echo "Docker Image: $(DOCKER_IMAGE)"
+	@echo "Docker Compose File: $(DOCKER_COMPOSE_FILE)"
+	@echo "Environment File: $(ENV_FILE)"
+	@if [ -f $(ENV_FILE) ]; then \
+		echo "$(GREEN)✅ Environment file exists$(NC)"; \
+	else \
+		echo "$(RED)❌ Environment file missing$(NC)"; \
+	fi 

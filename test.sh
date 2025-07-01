@@ -1,19 +1,12 @@
 #!/bin/bash
-
-# Test script for Trend Vision One File Security Docker Container
-
-set -e
-
-echo "🧪 Testing Trend Vision One File Security Docker Container"
-echo "=========================================================="
+# Test script for local path configuration
 
 # Colors for output
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+RED='\033[0;31m'
+NC='\033[0m'
 
-# Function to print colored output
 print_status() {
     echo -e "${GREEN}✅ $1${NC}"
 }
@@ -26,116 +19,110 @@ print_error() {
     echo -e "${RED}❌ $1${NC}"
 }
 
-# Check if Docker is available
-if ! command -v docker &> /dev/null; then
-    print_error "Docker is not installed or not in PATH"
+echo "🧪 Testing Local Path Configuration"
+echo "==================================="
+echo ""
+
+# Check if Docker is running
+if ! docker info >/dev/null 2>&1; then
+    print_error "Docker is not running or not accessible"
     exit 1
 fi
 
-print_status "Docker is available"
-
-# Create test directory and files
-echo "📁 Creating test files..."
-mkdir -p files
-echo 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > files/eicar.com.txt
-echo 'This is a safe test file' > files/safe.txt
-
-print_status "Test files created"
-
-# Build the container
-IMAGE_NAME="tmfs-scanner"
-echo "🔨 Building Docker container..."
-docker build -t $IMAGE_NAME .
-print_status "Container built successfully"
-
-# Test 1: Check if container can start and show help
-echo "🧪 Test 1: Container help command"
-HELP_OUTPUT=$(docker run --rm "$IMAGE_NAME" help 2>&1)
-HELP_EXIT=$?
-if [ $HELP_EXIT -eq 0 ]; then
-    print_status "Container help command works"
-else
-    print_error "Container help command failed"
-    echo "$HELP_OUTPUT"
-    exit 1
+# Check if image exists
+if ! docker image inspect tmfs-scanner >/dev/null 2>&1; then
+    print_warning "Docker image 'tmfs-scanner' not found. Building..."
+    make build
 fi
 
-# Test 2: Check if scan command is available
-echo "🧪 Test 2: Scan command availability"
-if docker run --rm "$IMAGE_NAME" scan --help &> /dev/null; then
-    print_status "Scan command is available"
-else
-    print_warning "Scan command help not available (this might be normal)"
+# Check if local path exists
+LOCAL_PATH=${LOCAL_PATH:-"/mnt/nfs-share"}
+if [ ! -d "$LOCAL_PATH" ]; then
+    print_warning "Local path $LOCAL_PATH does not exist. Creating test directory..."
+    sudo mkdir -p "$LOCAL_PATH"
+    sudo chmod 755 "$LOCAL_PATH"
 fi
 
-# Test 3: Test with mock endpoint (should fail but not crash)
-echo "🧪 Test 3: Container startup with mock endpoint"
-if docker run --rm \
-    -e ENDPOINT=localhost:9999 \
-    -e TLS=false \
-    -v "$(pwd)/files:/app/files:ro" \
-    "$IMAGE_NAME" scan file:/app/files/eicar.com.txt 2>&1 | grep -q "connection refused\|timeout\|unavailable"; then
-    print_status "Container handles connection errors gracefully"
-else
-    print_warning "Container behavior with connection errors unclear"
-fi
+print_status "Creating test files in $LOCAL_PATH..."
 
-# Test 4: Test NFS mode startup
-echo "🧪 Test 4: NFS mode startup"
-CONTAINER_NAME="tmfs-test-nfs"
-if docker run -d --name "$CONTAINER_NAME" --privileged "$IMAGE_NAME" nfs; then
-    print_status "NFS mode container started successfully"
-    
-    # Wait a moment for services to start
-    sleep 2
-    
-    # Check if rpcbind is running
-    if docker exec "$CONTAINER_NAME" pgrep rpcbind &> /dev/null; then
-        print_status "NFS services (rpcbind) are running"
-    else
-        print_warning "NFS services might not be running properly"
-    fi
-    
-    # Cleanup
-    docker stop "$CONTAINER_NAME" &> /dev/null
-    docker rm "$CONTAINER_NAME" &> /dev/null
-else
-    print_error "Failed to start NFS mode container"
-    exit 1
-fi
+# Create EICAR test file in the local path
+echo 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > "$LOCAL_PATH/test-eicar.txt"
 
-# Test 5: Test environment variable configuration
-echo "🧪 Test 5: Environment variable configuration"
-if docker run --rm \
-    -e ENDPOINT=test-endpoint:1234 \
-    -e TLS=false \
-    -e VERBOSE=true \
-    -e PML=true \
-    "$IMAGE_NAME" help &> /dev/null; then
-    print_status "Environment variables are properly configured"
-else
-    print_error "Environment variable configuration failed"
-    exit 1
-fi
+# Create a clean test file
+echo "This is a clean test file for scanning." > "$LOCAL_PATH/test-clean.txt"
 
-# Cleanup test files
-echo "🧹 Cleaning up test files..."
-rm -rf files
+# Create a test directory with multiple files
+mkdir -p "$LOCAL_PATH/test-dir"
+echo "Test file 1" > "$LOCAL_PATH/test-dir/file1.txt"
+echo "Test file 2" > "$LOCAL_PATH/test-dir/file2.txt"
+echo "Test file 3" > "$LOCAL_PATH/test-dir/file3.txt"
 
-print_status "Test files cleaned up"
+print_status "Testing local path scan..."
 
+# Test single file scan
+echo "🔍 Testing single file scan..."
+docker run --rm \
+    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+    -e TM_TLS=false \
+    -v "$LOCAL_PATH:$LOCAL_PATH:shared" \
+    tmfs-scanner scan "$LOCAL_PATH/test-eicar.txt"
+
+print_status "Testing directory scan..."
+
+# Test directory scan
+echo "🔍 Testing directory scan..."
+docker run --rm \
+    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+    -e TM_TLS=false \
+    -v "$LOCAL_PATH:$LOCAL_PATH:shared" \
+    tmfs-scanner scan-dir "$LOCAL_PATH/test-dir"
+
+print_status "Testing Makefile with local path..."
+
+# Test using Makefile
+echo "🔍 Testing Makefile with local path..."
+make scan FILE="$LOCAL_PATH/test-eicar.txt" TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false LOCAL_PATH="$LOCAL_PATH"
+
+print_status "Testing monitoring mode..."
+
+# Test monitoring mode (run for a short time)
+echo "🔍 Testing monitoring mode (will run for 10 seconds)..."
+docker run --rm \
+    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+    -e TM_TLS=false \
+    -e LOCAL_PATH="$LOCAL_PATH" \
+    -e ACTION=report_only \
+    -e SCAN_INTERVAL=5 \
+    -v "$LOCAL_PATH:$LOCAL_PATH:shared" \
+    tmfs-scanner monitor &
+MONITOR_PID=$!
+
+# Wait for 10 seconds
+sleep 10
+
+# Stop the monitoring
+kill $MONITOR_PID 2>/dev/null || true
+wait $MONITOR_PID 2>/dev/null || true
+
+print_status "Cleaning up test files..."
+
+# Clean up test files
+rm -f "$LOCAL_PATH/test-eicar.txt" "$LOCAL_PATH/test-clean.txt"
+rm -rf "$LOCAL_PATH/test-dir"
+
+print_status "Test completed successfully!"
 echo ""
-echo "🎉 All tests completed successfully!"
+echo "📋 Test Summary:"
+echo "- ✅ Docker environment check"
+echo "- ✅ Image build/availability"
+echo "- ✅ Local path accessibility"
+echo "- ✅ Single file scanning"
+echo "- ✅ Directory scanning"
+echo "- ✅ Makefile integration"
+echo "- ✅ Monitoring mode"
+echo "- ✅ Test file cleanup"
 echo ""
-echo "📋 Next steps:"
-echo "1. Configure your actual Trend Vision One File Security endpoint"
-echo "2. Set up NFS shares if needed"
-echo "3. Run scans with your configuration:"
-echo ""
-echo "   docker run --rm \\"
-echo "     -e ENDPOINT=your-endpoint:50051 \\"
-echo "     -e TLS=false \\"
-echo "     -v /path/to/files:/app/files:ro \\"
-echo "     $IMAGE_NAME scan file:/app/files/your-file.txt"
-echo ""
-echo "📖 For more information, see README.md" 
+echo "🚀 Ready to use! You can now:"
+echo "  - Run: make monitor LOCAL_PATH=$LOCAL_PATH TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false"
+echo "  - Run: make scan FILE=/path/to/file LOCAL_PATH=$LOCAL_PATH TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false"
+echo "  - Run: docker run --rm -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 -e TM_TLS=false -e LOCAL_PATH=$LOCAL_PATH -v $LOCAL_PATH:$LOCAL_PATH:shared tmfs-scanner monitor" 

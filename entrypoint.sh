@@ -1,129 +1,150 @@
-#!/bin/sh
-# Entrypoint script for the container
+#!/bin/bash
+# Entrypoint script for Trend Vision One CLI container
 
-if [ "$1" = "help" ]; then
+# Default values
+LOCAL_PATH=${LOCAL_PATH:-"/mnt/nfs-share"}
+ACTION=${ACTION:-"quarantine"}
+SCAN_INTERVAL=${SCAN_INTERVAL:-30}
+QUARANTINE_DIR=${QUARANTINE_DIR:-"quarantine"}
+
+# Function to show help
+show_help() {
+    echo "🛡️ Trend Vision One CLI File Security Scanner"
+    echo "============================================="
+    echo ""
     echo "Usage:"
-    echo "  docker run <image> nfs                    # Start container with NFS support"
-    echo "  docker run <image> scan <file> [options]  # Scan a single file"
-    echo "  docker run <image> scanfiles [options]    # Scan multiple files"
-    echo "  docker run <image> monitor [options]      # Real-time monitoring with action"
-    echo "  docker run <image> quarantine             # Start monitoring with quarantine action"
-    echo "  docker run <image> delete                 # Start monitoring with delete action"
-    echo "  docker run <image> report                 # Start monitoring with report only"
+    echo "  docker run tmfs-cli-scanner <command> [options]"
     echo ""
-    echo "Real-time Monitoring:"
-    echo "  docker run <image> monitor                # Start monitoring with default settings"
-    echo "  docker run <image> monitor --action=quarantine    # Quarantine malicious files"
-    echo "  docker run <image> monitor --action=delete        # Delete malicious files"
-    echo "  docker run <image> monitor --action=report_only   # Report only, no action"
-    echo "  docker run <image> quarantine             # Direct quarantine action"
-    echo "  docker run <image> delete                 # Direct delete action"
-    echo "  docker run <image> report                 # Direct report only"
+    echo "Commands:"
+    echo "  scan <file>                    - Scan a single file"
+    echo "  scan-dir <directory>           - Scan all files in a directory"
+    echo "  monitor                        - Start real-time monitoring"
+    echo "  local                          - Start with local path support"
+    echo "  help                           - Show this help message"
     echo ""
-    echo "Environment variables:"
-    echo "  ENDPOINT=<host:port>     # File Security service endpoint (default: localhost:50051)"
-    echo "  TLS=<true|false>         # Enable/disable TLS (default: true)"
-    echo "  REGION=<region>          # Service region"
-    echo "  APIKEY=<key>             # API key for authentication"
-    echo "  PML=<true|false>         # Enable PML detection (default: false)"
-    echo "  FEEDBACK=<true|false>    # Enable SPN feedback (default: false)"
-    echo "  VERBOSE=<true|false>     # Enable verbose output (default: false)"
-    echo "  ACTIVE_CONTENT=<true|false> # Enable active content detection (default: false)"
-    echo "  TAGS=<tags>              # Comma-separated tags"
-    echo "  DIGEST=<true|false>      # Enable digest calculation (default: true)"
-    echo "  ACTION=<action>          # Monitor action: quarantine, delete, report_only"
-    echo "  NFS_SERVER=<ip>          # NFS server IP (default: 192.168.200.10)"
-    echo "  NFS_SHARE=<path>         # NFS share path (default: /mnt/nfs_share)"
-    echo "  SCAN_INTERVAL=<seconds>  # Scan interval in seconds (default: 30)"
-    echo "  QUARANTINE_DIR=<dir>     # Quarantine directory name (default: quarantine)"
-    exit 0
-fi
+    echo "Examples:"
+    echo "  # Scan a single file (Local Endpoint)"
+    echo "  docker run --rm -v /path/to/file:/app/file:ro \\"
+    echo "    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \\"
+    echo "    -e TM_TLS=false \\"
+    echo "    tmfs-cli-scanner scan /app/file"
+    echo ""
+    echo "  # Scan a single file (Cloud Vision One)"
+    echo "  docker run --rm -v /path/to/file:/app/file:ro \\"
+    echo "    -e TM_API_KEY=your-api-key \\"
+    echo "    tmfs-cli-scanner scan /app/file"
+    echo ""
+    echo "  # Scan a directory (Local Endpoint)"
+    echo "  docker run --rm -v /path/to/directory:/app/dir:ro \\"
+    echo "    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \\"
+    echo "    -e TM_TLS=false \\"
+    echo "    tmfs-cli-scanner scan-dir /app/dir"
+    echo ""
+    echo "  # Start real-time monitoring (Local Endpoint)"
+    echo "  docker run -d --privileged \\"
+    echo "    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \\"
+    echo "    -e TM_TLS=false \\"
+    echo "    -e LOCAL_PATH=/mnt/nfs-share \\"
+    echo "    -e ACTION=quarantine \\"
+    echo "    -v /mnt/nfs-share:/mnt/nfs-share:shared \\"
+    echo "    tmfs-cli-scanner monitor"
+    echo ""
+    echo "Environment Variables:"
+    echo "  TM_API_KEY     - Trend Vision One API key (required for cloud)"
+    echo "  TM_REGION      - Vision One region (default: us-east-1, cloud only)"
+    echo "  TM_ENDPOINT    - Local endpoint URL (e.g., my-release-visionone-filesecurity-scanner:50051)"
+    echo "  TM_TLS         - Enable TLS (default: true, set to false for local endpoints)"
+    echo "  TM_TIMEOUT     - Request timeout in seconds (default: 300)"
+    echo "  LOCAL_PATH     - Local host path to monitor (default: /mnt/nfs-share)"
+    echo "  ACTION         - Action for malicious files: quarantine, delete, report_only"
+    echo "  SCAN_INTERVAL  - Monitoring scan interval in seconds (default: 30)"
+    echo "  QUARANTINE_DIR - Quarantine directory name (default: quarantine)"
+    echo ""
+    echo "Supported Regions:"
+    echo "  us-east-1, eu-central-1, ap-southeast-1, ap-southeast-2,"
+    echo "  ap-northeast-1, ap-south-1, me-central-1"
+}
 
-# Start rpcbind for NFS support
-if [ "$1" = "nfs" ]; then
-    echo "Starting NFS client services..."
-    rpcbind
-    echo "NFS client services started. Container ready for NFS mounts."
+# Function to scan a single file
+scan_file() {
+    local file_path="$1"
+    echo "🔍 Scanning file: $file_path"
+    
+    if [ ! -f "$file_path" ]; then
+        echo "❌ Error: File not found: $file_path"
+        exit 1
+    fi
+    
+    # Use the same format as your working command
+    /app/tmfs-cli-wrapper.sh scan "file:$file_path"
+}
+
+# Function to scan a directory
+scan_directory() {
+    local dir_path="$1"
+    echo "🔍 Scanning directory: $dir_path"
+    
+    if [ ! -d "$dir_path" ]; then
+        echo "❌ Error: Directory not found: $dir_path"
+        exit 1
+    fi
+    
+    # For directory scanning, we'll scan each file individually
+    find "$dir_path" -type f | while read -r file; do
+        echo "  Scanning: $file"
+        /app/tmfs-cli-wrapper.sh scan "file:$file"
+    done
+}
+
+# Function to start monitoring
+start_monitoring() {
+    echo "🛡️ Starting real-time monitoring..."
+    exec /app/realtime-monitor-cli.sh
+}
+
+# Function to start local path mode
+start_local_mode() {
+    echo "📁 Starting local path mode..."
+    echo "Local Path: $LOCAL_PATH"
+    echo ""
+    echo "To scan files:"
+    echo "  docker exec <container_name> /app/tmfs-cli-wrapper.sh scan file:$LOCAL_PATH/file.txt"
+    echo ""
+    echo "Container is ready. Use 'docker exec' to run commands."
+    
     # Keep container running
     tail -f /dev/null
-elif [ "$1" = "scan" ]; then
-    shift
-    # Switch to tmfs user for scanning operations
-    exec su tmfs -c "/app/tmfs-wrapper.sh scan $*"
-elif [ "$1" = "scanfiles" ]; then
-    shift
-    # Switch to tmfs user for scanning operations
-    exec su tmfs -c "/app/scanfiles $*"
-elif [ "$1" = "monitor" ]; then
-    shift
-    # Parse monitor options
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            --action=*)
-                ACTION="${1#*=}"
-                shift
-                ;;
-            --nfs-server=*)
-                NFS_SERVER="${1#*=}"
-                shift
-                ;;
-            --nfs-share=*)
-                NFS_SHARE="${1#*=}"
-                shift
-                ;;
-            --scan-interval=*)
-                SCAN_INTERVAL="${1#*=}"
-                shift
-                ;;
-            --quarantine-dir=*)
-                QUARANTINE_DIR="${1#*=}"
-                shift
-                ;;
-            *)
-                echo "Unknown monitor option: $1"
-                exit 1
-                ;;
-        esac
-    done
-    # Run as root for NFS operations
-    exec /app/realtime-monitor.sh
-elif [ "$1" = "quarantine" ]; then
-    shift
-    ACTION=quarantine
-    # Run as root for NFS operations
-    exec /app/realtime-monitor.sh
-elif [ "$1" = "delete" ]; then
-    shift
-    ACTION=delete
-    # Run as root for NFS operations
-    exec /app/realtime-monitor.sh
-elif [ "$1" = "report" ]; then
-    shift
-    ACTION=report_only
-    # Run as root for NFS operations
-    exec /app/realtime-monitor.sh
-else
-    echo "Usage:"
-    echo "  docker run <image> nfs                    # Start container with NFS support"
-    echo "  docker run <image> scan <file> [options]  # Scan a single file"
-    echo "  docker run <image> scanfiles [options]    # Scan multiple files"
-    echo "  docker run <image> monitor [options]      # Real-time monitoring with action"
-    echo ""
-    echo "Environment variables:"
-    echo "  ENDPOINT=<host:port>     # File Security service endpoint (default: localhost:50051)"
-    echo "  TLS=<true|false>         # Enable/disable TLS (default: true)"
-    echo "  REGION=<region>          # Service region"
-    echo "  APIKEY=<key>             # API key for authentication"
-    echo "  PML=<true|false>         # Enable PML detection (default: false)"
-    echo "  FEEDBACK=<true|false>    # Enable SPN feedback (default: false)"
-    echo "  VERBOSE=<true|false>     # Enable verbose output (default: false)"
-    echo "  ACTIVE_CONTENT=<true|false> # Enable active content detection (default: false)"
-    echo "  TAGS=<tags>              # Comma-separated tags"
-    echo "  DIGEST=<true|false>      # Enable digest calculation (default: true)"
-    echo "  ACTION=<action>          # Monitor action: quarantine, delete, report_only"
-    echo "  NFS_SERVER=<ip>          # NFS server IP (default: 192.168.200.10)"
-    echo "  NFS_SHARE=<path>         # NFS share path (default: /mnt/nfs_share)"
-    echo "  SCAN_INTERVAL=<seconds>  # Scan interval in seconds (default: 30)"
-    echo "  QUARANTINE_DIR=<dir>     # Quarantine directory name (default: quarantine)"
-    exit 1
-fi 
+}
+
+# Main command processing
+case "$1" in
+    "scan")
+        if [ -z "$2" ]; then
+            echo "❌ Error: File path required for scan command"
+            echo "Usage: scan <file_path>"
+            exit 1
+        fi
+        scan_file "$2"
+        ;;
+    "scan-dir")
+        if [ -z "$2" ]; then
+            echo "❌ Error: Directory path required for scan-dir command"
+            echo "Usage: scan-dir <directory_path>"
+            exit 1
+        fi
+        scan_directory "$2"
+        ;;
+    "monitor")
+        start_monitoring
+        ;;
+    "local")
+        start_local_mode
+        ;;
+    "help"|"--help"|"-h"|"")
+        show_help
+        ;;
+    *)
+        # Pass through to CLI wrapper for other commands
+        /app/tmfs-cli-wrapper.sh "$@"
+        ;;
+esac 

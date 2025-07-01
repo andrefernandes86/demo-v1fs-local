@@ -2,112 +2,74 @@ version: '3.8'
 
 services:
   tmfs-scanner:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tmfs-scanner
     container_name: tmfs-scanner
     privileged: true  # Required for NFS mounting
     environment:
-      - ENDPOINT=192.168.200.50:30230
-      - TLS=false
-      - PML=false
-      - FEEDBACK=false
-      - VERBOSE=false
-      - ACTIVE_CONTENT=false
-      - TAGS=
-      - DIGEST=true
-      - TM_AM_SCAN_TIMEOUT_SECS=300
-      - TM_AM_DISABLE_CERT_VERIFY=0
-      - NFS_SERVER=192.168.200.10
-      - NFS_SHARE=/mnt/nfs_share
-      - ACTION=quarantine
-      - SCAN_INTERVAL=30
-      - QUARANTINE_DIR=quarantine
+      # Required: Trend Vision One API Key
+      - TM_API_KEY=${TM_API_KEY}
+      
+      # Optional: Vision One Configuration
+      - TM_REGION=${TM_REGION:-us-east-1}
+      - TM_ENDPOINT=${TM_ENDPOINT}
+      - TM_TLS=${TM_TLS:-true}
+      - TM_TIMEOUT=${TM_TIMEOUT:-300}
+      
+      # NFS Configuration
+      - NFS_SERVER=${NFS_SERVER:-192.168.200.10}
+      - NFS_SHARE=${NFS_SHARE:-/mnt/nfs_share}
+      
+      # Monitoring Configuration
+      - ACTION=${ACTION:-quarantine}
+      - SCAN_INTERVAL=${SCAN_INTERVAL:-30}
+      - QUARANTINE_DIR=${QUARANTINE_DIR:-quarantine}
+    
     volumes:
-      # Mount NFS shares here
+      # NFS share volume (shared with host)
       - nfs-share:/mnt/nfs:shared
-      # Mount local files for scanning
+      
+      # Optional: Mount local files for scanning
       - ./files:/app/files:ro
+    
     networks:
       - tmfs-network
-    command: ["monitor"]  # Start real-time monitoring
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "/app/tmcli", "--version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    restart: unless-stopped
 
-  tmfs-scanner-delete:
-    build: .
-    container_name: tmfs-scanner-delete
-    privileged: true  # Required for NFS mounting
-    environment:
-      - ENDPOINT=192.168.200.50:30230
-      - TLS=false
-      - PML=false
-      - FEEDBACK=false
-      - VERBOSE=false
-      - ACTIVE_CONTENT=false
-      - TAGS=
-      - DIGEST=true
-      - TM_AM_SCAN_TIMEOUT_SECS=300
-      - TM_AM_DISABLE_CERT_VERIFY=0
-      - NFS_SERVER=192.168.200.10
-      - NFS_SHARE=/mnt/nfs_share
-      - ACTION=delete
-      - SCAN_INTERVAL=30
-    volumes:
-      # Mount NFS shares here
-      - nfs-share:/mnt/nfs:shared
-      # Mount local files for scanning
-      - ./files:/app/files:ro
-    networks:
-      - tmfs-network
-    command: ["monitor"]  # Start real-time monitoring with delete action
-
-  tmfs-scanner-report:
-    build: .
-    container_name: tmfs-scanner-report
-    privileged: true  # Required for NFS mounting
-    environment:
-      - ENDPOINT=192.168.200.50:30230
-      - TLS=false
-      - PML=false
-      - FEEDBACK=false
-      - VERBOSE=false
-      - ACTIVE_CONTENT=false
-      - TAGS=
-      - DIGEST=true
-      - TM_AM_SCAN_TIMEOUT_SECS=300
-      - TM_AM_DISABLE_CERT_VERIFY=0
-      - NFS_SERVER=192.168.200.10
-      - NFS_SHARE=/mnt/nfs_share
-      - ACTION=report_only
-      - SCAN_INTERVAL=30
-    volumes:
-      # Mount NFS shares here
-      - nfs-share:/mnt/nfs:shared
-      # Mount local files for scanning
-      - ./files:/app/files:ro
-    networks:
-      - tmfs-network
-    command: ["monitor"]  # Start real-time monitoring with report only
-
+  # Service for single scans
   tmfs-scan:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: tmfs-scanner
     container_name: tmfs-scan
     environment:
-      - ENDPOINT=192.168.200.50:30230
-      - TLS=false
-      - PML=false
-      - FEEDBACK=false
-      - VERBOSE=false
-      - ACTIVE_CONTENT=false
-      - TAGS=
-      - DIGEST=true
-      - TM_AM_SCAN_TIMEOUT_SECS=300
-      - TM_AM_DISABLE_CERT_VERIFY=0
+      - TM_API_KEY=${TM_API_KEY}
+      - TM_REGION=${TM_REGION:-us-east-1}
+      - TM_ENDPOINT=${TM_ENDPOINT}
+      - TM_TLS=${TM_TLS:-true}
+      - TM_TIMEOUT=${TM_TIMEOUT:-300}
+    
     volumes:
       # Mount files to scan
       - ./files:/app/files:ro
+    
     networks:
       - tmfs-network
-    command: ["scan", "file:/app/files/eicar.com.txt"]
-    depends_on:
-      - tmfs-scanner
+    
+    profiles:
+      - scan  # Only start when explicitly requested
 
 volumes:
   nfs-share:
