@@ -97,8 +97,8 @@ while true; do
     echo "🔄 Scanning for new files... ($(date))"
     
     # Find new files recursively in all subdirectories
-    # Focus on executable and script files
-    NEW_FILES=$(find /mnt/nfs -type f \( -name "*.exe" -o -name "*.dll" -o -name "*.bat" -o -name "*.ps1" -o -name "*.vbs" -o -name "*.js" -o -name "*.jar" -o -name "*.msi" -o -name "*.com" -o -name "*.scr" -o -name "*.pif" -o -name "*.cmd" -o -name "*.reg" -o -name "*.wsf" -o -name "*.hta" -o -name "*.lnk" \) -newer /tmp/last_scan 2>/dev/null || true)
+    # Scan every file, regardless of extension
+    NEW_FILES=$(find /mnt/nfs -type f -newer /tmp/last_scan 2>/dev/null || true)
     
     if [ -n "$NEW_FILES" ]; then
         echo "📋 Found new files to scan:"
