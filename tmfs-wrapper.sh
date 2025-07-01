@@ -136,4 +136,12 @@ fi
 
 # Execute the command
 echo "Debug: Final command: /app/tmfs $ARGS $SCAN_ARGS"
-exec /app/tmfs $ARGS $SCAN_ARGS 
+
+# Try without file: prefix if it exists
+if echo "$SCAN_ARGS" | grep -q 'file:'; then
+    SCAN_ARGS_NO_PREFIX=$(echo "$SCAN_ARGS" | sed 's/file://')
+    echo "Debug: Trying without file: prefix: /app/tmfs $ARGS $SCAN_ARGS_NO_PREFIX"
+    exec /app/tmfs $ARGS $SCAN_ARGS_NO_PREFIX
+else
+    exec /app/tmfs $ARGS $SCAN_ARGS
+fi 
