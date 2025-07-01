@@ -90,14 +90,40 @@ docker-compose run --rm tmfs-scan
 
 ## Configuration
 
+### Vision One Regions and API Key
+
+The Trend Vision One File Security service configuration depends on your deployment type:
+
+#### **Local Deployment (No Region/API Key Required)**
+For local endpoints like `192.168.200.50:50051`:
+- **No API Key needed**
+- **No Region needed**
+- Just specify the `ENDPOINT` and set `TLS=false`
+
+#### **Cloud Vision One Deployment (Region/API Key Required)**
+For cloud-based Vision One services:
+- **API Key**: A valid API key must be provided via `APIKEY` environment variable or `TM_AM_AUTH_KEY`
+- **Region**: Must be one of the supported Vision One regions
+
+#### Supported Regions:
+| Region | Description |
+|--------|-------------|
+| `us-east-1` | US East |
+| `eu-central-1` | Europe Central |
+| `ap-southeast-1` | Asia Pacific Southeast 1 |
+| `ap-southeast-2` | Asia Pacific Southeast 2 |
+| `ap-northeast-1` | Asia Pacific Northeast 1 |
+| `ap-south-1` | Asia Pacific South 1 |
+| `me-central-1` | Middle East Central 1 |
+
 ### Environment Variables
 
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
 | `ENDPOINT` | File Security service endpoint | `localhost:50051` | `my-release-visionone-filesecurity-scanner:50051` |
 | `TLS` | Enable/disable TLS | `true` | `false` |
-| `REGION` | Service region | `` | `us-east-1` |
-| `APIKEY` | API key for authentication | `` | `your-api-key` |
+| `REGION` | Service region (cloud only) | `` | `us-east-1`, `eu-central-1`, `ap-southeast-1`, `ap-southeast-2`, `ap-northeast-1`, `ap-south-1`, `me-central-1` |
+| `APIKEY` | API key for authentication (cloud only) | `` | `your-api-key` |
 | `PML` | Enable PML detection | `false` | `true` |
 | `FEEDBACK` | Enable SPN feedback | `false` | `true` |
 | `VERBOSE` | Enable verbose output | `false` | `true` |
@@ -140,6 +166,15 @@ docker run tmfs-scanner scanfiles \
   --tag=prod,scan \
   --digest=false \
   --addr=my-release-visionone-filesecurity-scanner:50051
+
+# Available Vision One regions:
+# - us-east-1 (US East)
+# - eu-central-1 (Europe Central)
+# - ap-southeast-1 (Asia Pacific Southeast 1)
+# - ap-southeast-2 (Asia Pacific Southeast 2)
+# - ap-northeast-1 (Asia Pacific Northeast 1)
+# - ap-south-1 (Asia Pacific South 1)
+# - me-central-1 (Middle East Central 1)
 ```
 
 ## NFS Mounting
@@ -223,12 +258,37 @@ docker run --rm \
   -e ENDPOINT=prod-visionone-filesecurity.company.com:50051 \
   -e TLS=true \
   -e APIKEY=your-production-api-key \
-  -e REGION=us-west-2 \
+  -e REGION=us-east-1 \
   -e PML=true \
   -e VERBOSE=true \
   -e TAGS=prod,automated \
   -v /path/to/files:/app/files:ro \
   tmfs-scanner scan file:/app/files/suspicious.exe
+```
+
+### Example 4: Regional Configuration Examples
+
+```bash
+# US East Region
+docker run --rm \
+  -e ENDPOINT=visionone-filesecurity.us-east-1.company.com:50051 \
+  -e REGION=us-east-1 \
+  -e APIKEY=your-us-east-api-key \
+  tmfs-scanner scan file:./test.txt
+
+# Europe Central Region
+docker run --rm \
+  -e ENDPOINT=visionone-filesecurity.eu-central-1.company.com:50051 \
+  -e REGION=eu-central-1 \
+  -e APIKEY=your-eu-central-api-key \
+  tmfs-scanner scan file:./test.txt
+
+# Asia Pacific Southeast 1 Region
+docker run --rm \
+  -e ENDPOINT=visionone-filesecurity.ap-southeast-1.company.com:50051 \
+  -e REGION=ap-southeast-1 \
+  -e APIKEY=your-ap-southeast-1-api-key \
+  tmfs-scanner scan file:./test.txt
 ```
 
 ## Troubleshooting
