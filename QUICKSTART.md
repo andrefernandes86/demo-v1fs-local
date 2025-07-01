@@ -35,7 +35,7 @@ chmod +x test.sh
 docker run -d \
   --name tmfs-monitor \
   --privileged \
-  -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TM_ENDPOINT=192.168.200.50:30230 \
   -e TM_TLS=false \
   -e LOCAL_PATH=/mnt/nfs-share \
   -e ACTION=quarantine \
@@ -87,10 +87,10 @@ demo-v1fs-local/
 make build
 
 # Start monitoring
-make monitor LOCAL_PATH=/mnt/nfs-share TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false
+make monitor LOCAL_PATH=/mnt/nfs-share TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false
 
 # Scan a single file
-make scan FILE=/path/to/file TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false
+make scan FILE=/path/to/file TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false
 
 # Stop all containers
 make stop

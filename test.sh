@@ -62,7 +62,7 @@ print_status "Testing local path scan..."
 # Test single file scan
 echo "🔍 Testing single file scan..."
 docker run --rm \
-    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+    -e TM_ENDPOINT=192.168.200.50:30230 \
     -e TM_TLS=false \
     -v "$LOCAL_PATH:$LOCAL_PATH:shared" \
     tmfs-scanner scan "$LOCAL_PATH/test-eicar.txt"
@@ -72,23 +72,27 @@ print_status "Testing directory scan..."
 # Test directory scan
 echo "🔍 Testing directory scan..."
 docker run --rm \
-    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+    -e TM_ENDPOINT=192.168.200.50:30230 \
     -e TM_TLS=false \
     -v "$LOCAL_PATH:$LOCAL_PATH:shared" \
     tmfs-scanner scan-dir "$LOCAL_PATH/test-dir"
 
 print_status "Testing Makefile with local path..."
 
-# Test using Makefile
+# Test using Makefile (if available)
 echo "🔍 Testing Makefile with local path..."
-make scan FILE="$LOCAL_PATH/test-eicar.txt" TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false LOCAL_PATH="$LOCAL_PATH"
+if command -v make >/dev/null 2>&1; then
+    make scan FILE="$LOCAL_PATH/test-eicar.txt" TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false LOCAL_PATH="$LOCAL_PATH"
+else
+    echo "⚠️  Make not available, skipping Makefile test"
+fi
 
 print_status "Testing monitoring mode..."
 
 # Test monitoring mode (run for a short time)
 echo "🔍 Testing monitoring mode (will run for 10 seconds)..."
 docker run --rm \
-    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+    -e TM_ENDPOINT=192.168.200.50:30230 \
     -e TM_TLS=false \
     -e LOCAL_PATH="$LOCAL_PATH" \
     -e ACTION=report_only \
@@ -123,6 +127,6 @@ echo "- ✅ Monitoring mode"
 echo "- ✅ Test file cleanup"
 echo ""
 echo "🚀 Ready to use! You can now:"
-echo "  - Run: make monitor LOCAL_PATH=$LOCAL_PATH TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false"
-echo "  - Run: make scan FILE=/path/to/file LOCAL_PATH=$LOCAL_PATH TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TM_TLS=false"
-echo "  - Run: docker run --rm -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 -e TM_TLS=false -e LOCAL_PATH=$LOCAL_PATH -v $LOCAL_PATH:$LOCAL_PATH:shared tmfs-scanner monitor" 
+echo "  - Run: make monitor LOCAL_PATH=$LOCAL_PATH TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false"
+echo "  - Run: make scan FILE=/path/to/file LOCAL_PATH=$LOCAL_PATH TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false"
+echo "  - Run: docker run --rm -e TM_ENDPOINT=192.168.200.50:30230 -e TM_TLS=false -e LOCAL_PATH=$LOCAL_PATH -v $LOCAL_PATH:$LOCAL_PATH:shared tmfs-scanner monitor" 
