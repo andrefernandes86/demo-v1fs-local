@@ -199,8 +199,14 @@ monitor_directory() {
             
             find "$dir" -type f -not -path "$dir/quarantine/*" | while read -r file; do
                 echo "Checking: $file"
-                # Mock scan result
-                if [[ "$file" == *"test"* ]]; then
+                # Mock scan result - detect various malware indicators
+                filename=$(basename "$file")
+                if [[ "$filename" == *"test"* ]] || \
+                   [[ "$filename" == *"eicar"* ]] || \
+                   [[ "$filename" == *"ms09"* ]] || \
+                   [[ "$filename" == *"ms14"* ]] || \
+                   [[ "$filename" == *"malware"* ]] || \
+                   [[ "$filename" == *"virus"* ]]; then
                     echo "🚨 MALICIOUS FILE DETECTED: $file"
                     if [ "$ACTION" = "quarantine" ]; then
                         mv "$file" "$dir/quarantine/"
