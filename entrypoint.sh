@@ -7,12 +7,18 @@ if [ "$1" = "help" ]; then
     echo "  docker run <image> scan <file> [options]  # Scan a single file"
     echo "  docker run <image> scanfiles [options]    # Scan multiple files"
     echo "  docker run <image> monitor [options]      # Real-time monitoring with action"
+    echo "  docker run <image> quarantine             # Start monitoring with quarantine action"
+    echo "  docker run <image> delete                 # Start monitoring with delete action"
+    echo "  docker run <image> report                 # Start monitoring with report only"
     echo ""
     echo "Real-time Monitoring:"
     echo "  docker run <image> monitor                # Start monitoring with default settings"
     echo "  docker run <image> monitor --action=quarantine    # Quarantine malicious files"
     echo "  docker run <image> monitor --action=delete        # Delete malicious files"
     echo "  docker run <image> monitor --action=report_only   # Report only, no action"
+    echo "  docker run <image> quarantine             # Direct quarantine action"
+    echo "  docker run <image> delete                 # Direct delete action"
+    echo "  docker run <image> report                 # Direct report only"
     echo ""
     echo "Environment variables:"
     echo "  ENDPOINT=<host:port>     # File Security service endpoint (default: localhost:50051)"
@@ -77,6 +83,18 @@ elif [ "$1" = "monitor" ]; then
                 ;;
         esac
     done
+    exec /app/realtime-monitor.sh
+elif [ "$1" = "quarantine" ]; then
+    shift
+    ACTION=quarantine
+    exec /app/realtime-monitor.sh
+elif [ "$1" = "delete" ]; then
+    shift
+    ACTION=delete
+    exec /app/realtime-monitor.sh
+elif [ "$1" = "report" ]; then
+    shift
+    ACTION=report_only
     exec /app/realtime-monitor.sh
 else
     echo "Usage:"

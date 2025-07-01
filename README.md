@@ -95,10 +95,30 @@ docker-compose run --rm tmfs-scan
 The Trend Vision One File Security service configuration depends on your deployment type:
 
 #### **Local Deployment (No Region/API Key Required)**
-For local endpoints like `192.168.200.50:50051`:
+For local endpoints like `192.168.200.50:30230`:
 - **No API Key needed**
 - **No Region needed**
 - Just specify the `ENDPOINT` and set `TLS=false`
+
+#### **Kubernetes Deployment Requirements**
+For Kubernetes-hosted scanners, ensure proper port publishing:
+
+```bash
+# Check if NodePort service is configured
+kubectl get svc my-release-visionone-filesecurity-scanner -n visionone-filesecurity
+
+# Verify NodePort is accessible
+telnet 192.168.200.50 30230
+
+# If using LoadBalancer, check external IP
+kubectl get svc -n visionone-filesecurity -o wide
+```
+
+**Required Kubernetes Configuration:**
+- **Service Type**: `NodePort` or `LoadBalancer`
+- **Port Mapping**: `50051:30230/TCP` (internal:external)
+- **Node Access**: Ensure nodes are accessible from Docker host
+- **Firewall**: Allow traffic on NodePort (30230)
 
 #### **Cloud Vision One Deployment (Region/API Key Required)**
 For cloud-based Vision One services:
@@ -344,6 +364,40 @@ docker run -d \
   -e NFS_SHARE=/mnt/nfs_share \
   tmfs-scanner:latest \
   monitor
+
+# Direct action commands (recommended)
+docker run -d \
+  --name tmfs-quarantine \
+  --privileged \
+  --network host \
+  -e ENDPOINT=192.168.200.50:30230 \
+  -e TLS=false \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  tmfs-scanner:latest \
+  quarantine
+
+docker run -d \
+  --name tmfs-delete \
+  --privileged \
+  --network host \
+  -e ENDPOINT=192.168.200.50:30230 \
+  -e TLS=false \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  tmfs-scanner:latest \
+  delete
+
+docker run -d \
+  --name tmfs-report \
+  --privileged \
+  --network host \
+  -e ENDPOINT=192.168.200.50:30230 \
+  -e TLS=false \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  tmfs-scanner:latest \
+  report
 
 # Monitor with specific action parameter
 docker run -d \
