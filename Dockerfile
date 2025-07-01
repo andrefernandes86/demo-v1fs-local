@@ -43,8 +43,8 @@ RUN chmod +x /app/tmfs /app/scanfiles && \
     chown tmfs:tmfs /app/tmfs /app/scanfiles && \
     ls -la /app/tmfs /app/scanfiles
 
-# Create mount points for NFS shares
-RUN mkdir -p /mnt/nfs && chown tmfs:tmfs /mnt/nfs
+# Create mount points for NFS shares and files
+RUN mkdir -p /mnt/nfs /app/files && chown tmfs:tmfs /mnt/nfs /app/files
 
 # Copy wrapper and entrypoint scripts
 COPY tmfs-wrapper.sh /app/tmfs-wrapper.sh

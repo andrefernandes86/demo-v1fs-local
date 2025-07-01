@@ -109,5 +109,20 @@ ARGS="$ARGS -addr=$ENDPOINT"
 # Debug: Show what we're executing
 echo "Debug: Executing /app/tmfs $ARGS $SCAN_ARGS"
 
+# Debug: Check if file exists (extract file path from scan args)
+FILE_PATH=$(echo "$SCAN_ARGS" | grep -o 'file:[^[:space:]]*' | sed 's/file://')
+if [ -n "$FILE_PATH" ]; then
+    echo "Debug: Checking if file exists: $FILE_PATH"
+    if [ -f "$FILE_PATH" ]; then
+        echo "Debug: File exists and is readable"
+        ls -la "$FILE_PATH"
+    else
+        echo "Debug: File does not exist or is not readable"
+        echo "Debug: Current directory: $(pwd)"
+        echo "Debug: Directory contents:"
+        ls -la
+    fi
+fi
+
 # Execute the command
 exec /app/tmfs $ARGS $SCAN_ARGS 
