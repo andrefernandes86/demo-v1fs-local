@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  tmfs-scanner:
+    build: .
+    container_name: tmfs-scanner
+    privileged: true  # Required for NFS mounting
+    environment:
+      - ENDPOINT=my-release-visionone-filesecurity-scanner:50051
+      - TLS=false
+      - REGION=
+      - APIKEY=
+      - PML=false
+      - FEEDBACK=false
+      - VERBOSE=false
+      - ACTIVE_CONTENT=false
+      - TAGS=
+      - DIGEST=true
+      - TM_AM_SCAN_TIMEOUT_SECS=300
+      - TM_AM_DISABLE_CERT_VERIFY=0
+    volumes:
+      # Mount NFS shares here
+      - nfs-share:/mnt/nfs:shared
+      # Mount local files for scanning
+      - ./files:/app/files:ro
+    networks:
+      - tmfs-network
+    command: ["nfs"]  # Start with NFS support
+
+  tmfs-scan:
+    build: .
+    container_name: tmfs-scan
+    environment:
+      - ENDPOINT=my-release-visionone-filesecurity-scanner:50051
+      - TLS=false
+      - REGION=
+      - APIKEY=
+      - PML=false
+      - FEEDBACK=false
+      - VERBOSE=false
+      - ACTIVE_CONTENT=false
+      - TAGS=
+      - DIGEST=true
+      - TM_AM_SCAN_TIMEOUT_SECS=300
+      - TM_AM_DISABLE_CERT_VERIFY=0
+    volumes:
+      # Mount files to scan
+      - ./files:/app/files:ro
+    networks:
+      - tmfs-network
+    command: ["scan", "file:/app/files/eicar.com.txt"]
+    depends_on:
+      - tmfs-scanner
+
+volumes:
+  nfs-share:
+    driver: local
+
+networks:
+  tmfs-network:
+    driver: bridge 
