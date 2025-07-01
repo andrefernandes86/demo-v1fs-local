@@ -4,7 +4,9 @@
 # Recursive scanning of all subdirectories
 
 # Default values
-LOCAL_PATH=${LOCAL_PATH:-"/mnt/nfs-share"}
+NFS_SERVER=${NFS_SERVER:-"192.168.200.50"}
+NFS_SHARE=${NFS_SHARE:-"/mnt/nfs-share"}
+MOUNT_PATH=${MOUNT_PATH:-"/mnt/nfs"}
 ACTION=${ACTION:-"quarantine"}
 SCAN_INTERVAL=${SCAN_INTERVAL:-30}
 QUARANTINE_DIR=${QUARANTINE_DIR:-"quarantine"}
@@ -33,7 +35,9 @@ print_alert() {
 
 echo "🛡️ Real-time Malicious File Monitor (CLI Version)"
 echo "=================================================="
-echo "Local Path: $LOCAL_PATH"
+echo "NFS Server: $NFS_SERVER"
+echo "NFS Share: $NFS_SHARE"
+echo "Mount Path: $MOUNT_PATH"
 echo "Action: $ACTION"
 echo "Scan Interval: ${SCAN_INTERVAL}s"
 echo "Recursive: Enabled (all subdirectories)"
@@ -50,21 +54,25 @@ case "$ACTION" in
         ;;
 esac
 
-# Check if local path exists
-if [ ! -d "$LOCAL_PATH" ]; then
-    echo "📁 Checking local path: $LOCAL_PATH"
-    print_error "Local path does not exist: $LOCAL_PATH"
-    print_error "Please ensure the path exists on the host and is mounted into the container"
-    exit 1
+# Mount NFS share if not already mounted
+if ! mountpoint -q "$MOUNT_PATH"; then
+    echo "📁 Mounting NFS share..."
+    if mount -t nfs -o nolock "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH"; then
+        print_status "NFS share mounted successfully"
+    else
+        print_error "Failed to mount NFS share"
+        print_error "Note: Container needs to run with --privileged flag"
+        exit 1
+    fi
 fi
 
-print_status "Local path is accessible: $LOCAL_PATH"
+print_status "NFS share is accessible: $MOUNT_PATH"
 
 # Create quarantine directory if needed
 if [ "$ACTION" = "quarantine" ]; then
     echo "📦 Creating quarantine directory..."
-    mkdir -p "$LOCAL_PATH/$QUARANTINE_DIR"
-    print_status "Quarantine directory ready: $LOCAL_PATH/$QUARANTINE_DIR"
+    mkdir -p "$MOUNT_PATH/$QUARANTINE_DIR"
+    print_status "Quarantine directory ready: $MOUNT_PATH/$QUARANTINE_DIR"
 fi
 
 echo ""
@@ -82,7 +90,9 @@ while true; do
     clear
     echo "🛡️ Real-time Malicious File Monitor (CLI Version)"
     echo "=================================================="
-    echo "Local Path: $LOCAL_PATH"
+    echo "NFS Server: $NFS_SERVER"
+    echo "NFS Share: $NFS_SHARE"
+    echo "Mount Path: $MOUNT_PATH"
     echo "Action: $ACTION"
     echo "Scan Interval: ${SCAN_INTERVAL}s"
     echo "Recursive: Enabled (all subdirectories)"
@@ -97,7 +107,7 @@ while true; do
     
     echo "🔄 Scanning for files... ($(date))"
     # Scan every file, regardless of extension and modification time
-    NEW_FILES=$(find "$LOCAL_PATH" -type f 2>/dev/null || true)
+    NEW_FILES=$(find "$MOUNT_PATH" -type f 2>/dev/null || true)
     if [ -n "$NEW_FILES" ]; then
         echo "📋 Found files to scan:"
         echo "$NEW_FILES" | while read -r file; do
@@ -127,7 +137,7 @@ while true; do
                         "quarantine")
                             echo "    🚨 Quarantining file..."
                             FILENAME=$(basename "$file")
-                            QUARANTINE_PATH="$LOCAL_PATH/$QUARANTINE_DIR/${FILENAME}.quarantined_$(date +%Y%m%d_%H%M%S)"
+                            QUARANTINE_PATH="$MOUNT_PATH/$QUARANTINE_DIR/${FILENAME}.quarantined_$(date +%Y%m%d_%H%M%S)"
                             if mv "$file" "$QUARANTINE_PATH"; then
                                 print_status "File quarantined: $file → $QUARANTINE_PATH"
                                 echo "QUARANTINED: $file -> $QUARANTINE_PATH at $(date)" >> /tmp/malicious_files_quarantined.log

@@ -86,34 +86,38 @@ monitor: ## Start real-time monitoring
 		exit 1; \
 	fi
 	docker run -d \
-		--name tmfs-cli-monitor \
+		--name tmfs-monitor \
 		--privileged \
 		$(if $(TM_ENDPOINT),-e TM_ENDPOINT=$(TM_ENDPOINT),--env-file $(ENV_FILE)) \
 		$(if $(TM_TLS),-e TM_TLS=$(TM_TLS),-e TM_TLS=false) \
-		$(if $(LOCAL_PATH),-e LOCAL_PATH=$(LOCAL_PATH),-e LOCAL_PATH=/mnt/nfs-share) \
-		$(if $(LOCAL_PATH),-v $(LOCAL_PATH):$(LOCAL_PATH):shared,-v nfs-share:/mnt/nfs:shared) \
+		$(if $(NFS_SERVER),-e NFS_SERVER=$(NFS_SERVER),-e NFS_SERVER=192.168.200.50) \
+		$(if $(NFS_SHARE),-e NFS_SHARE=$(NFS_SHARE),-e NFS_SHARE=/mnt/nfs-share) \
+		$(if $(MOUNT_PATH),-e MOUNT_PATH=$(MOUNT_PATH),-e MOUNT_PATH=/mnt/nfs) \
+		$(if $(MOUNT_PATH),-v $(MOUNT_PATH):$(MOUNT_PATH):shared,-v /mnt/nfs:/mnt/nfs:shared) \
 		$(DOCKER_IMAGE) monitor
 
-local: ## Start local path support mode
-	@echo "$(GREEN)📁 Starting local path support mode...$(NC)"
+nfs: ## Start NFS support mode
+	@echo "$(GREEN)📁 Starting NFS support mode...$(NC)"
 	@if [ ! -f $(ENV_FILE) ] && [ -z "$(TM_ENDPOINT)" ]; then \
 		echo "$(RED)❌ Error: Either $(ENV_FILE) file or TM_ENDPOINT environment variable is required.$(NC)"; \
 		exit 1; \
 	fi
 	docker run -d \
-		--name tmfs-cli-local \
+		--name tmfs-nfs \
 		--privileged \
 		$(if $(TM_ENDPOINT),-e TM_ENDPOINT=$(TM_ENDPOINT),--env-file $(ENV_FILE)) \
 		$(if $(TM_TLS),-e TM_TLS=$(TM_TLS),-e TM_TLS=false) \
-		$(if $(LOCAL_PATH),-e LOCAL_PATH=$(LOCAL_PATH),-e LOCAL_PATH=/mnt/nfs-share) \
-		$(if $(LOCAL_PATH),-v $(LOCAL_PATH):$(LOCAL_PATH):shared,) \
-		$(DOCKER_IMAGE) local
+		$(if $(NFS_SERVER),-e NFS_SERVER=$(NFS_SERVER),-e NFS_SERVER=192.168.200.50) \
+		$(if $(NFS_SHARE),-e NFS_SHARE=$(NFS_SHARE),-e NFS_SHARE=/mnt/nfs-share) \
+		$(if $(MOUNT_PATH),-e MOUNT_PATH=$(MOUNT_PATH),-e MOUNT_PATH=/mnt/nfs) \
+		$(if $(MOUNT_PATH),-v $(MOUNT_PATH):$(MOUNT_PATH):shared,) \
+		$(DOCKER_IMAGE) nfs
 
 stop: ## Stop all containers
 	@echo "$(YELLOW)🛑 Stopping all containers...$(NC)"
 	docker-compose -f $(DOCKER_COMPOSE_FILE) down
-	docker stop tmfs-cli-monitor tmfs-cli-local 2>/dev/null || true
-	docker rm tmfs-cli-monitor tmfs-cli-local 2>/dev/null || true
+	docker stop tmfs-monitor tmfs-nfs 2>/dev/null || true
+	docker rm tmfs-monitor tmfs-nfs 2>/dev/null || true
 
 logs: ## Show container logs
 	@echo "$(GREEN)📋 Showing container logs...$(NC)"

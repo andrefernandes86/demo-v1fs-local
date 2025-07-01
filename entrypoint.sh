@@ -2,7 +2,9 @@
 # Entrypoint script for Trend Vision One CLI container
 
 # Default values
-LOCAL_PATH=${LOCAL_PATH:-"/mnt/nfs-share"}
+NFS_SERVER=${NFS_SERVER:-"192.168.200.50"}
+NFS_SHARE=${NFS_SHARE:-"/mnt/nfs-share"}
+MOUNT_PATH=${MOUNT_PATH:-"/mnt/nfs"}
 ACTION=${ACTION:-"quarantine"}
 SCAN_INTERVAL=${SCAN_INTERVAL:-30}
 QUARANTINE_DIR=${QUARANTINE_DIR:-"quarantine"}
@@ -44,7 +46,8 @@ show_help() {
     echo "  docker run -d --privileged \\"
     echo "    -e TM_ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \\"
     echo "    -e TM_TLS=false \\"
-    echo "    -e LOCAL_PATH=/mnt/nfs-share \\"
+    echo "    -e NFS_SERVER=192.168.200.50 \
+    -e NFS_SHARE=/mnt/nfs-share \\"
     echo "    -e ACTION=quarantine \\"
     echo "    -v /mnt/nfs-share:/mnt/nfs-share:shared \\"
     echo "    tmfs-cli-scanner monitor"
@@ -55,7 +58,9 @@ show_help() {
     echo "  TM_ENDPOINT    - Local endpoint URL (e.g., my-release-visionone-filesecurity-scanner:50051)"
     echo "  TM_TLS         - Enable TLS (default: true, set to false for local endpoints)"
     echo "  TM_TIMEOUT     - Request timeout in seconds (default: 300)"
-    echo "  LOCAL_PATH     - Local host path to monitor (default: /mnt/nfs-share)"
+    echo "  NFS_SERVER     - NFS server IP (default: 192.168.200.50)"
+    echo "  NFS_SHARE      - NFS share path (default: /mnt/nfs-share)"
+    echo "  MOUNT_PATH     - Mount point inside container (default: /mnt/nfs)"
     echo "  ACTION         - Action for malicious files: quarantine, delete, report_only"
     echo "  SCAN_INTERVAL  - Monitoring scan interval in seconds (default: 30)"
     echo "  QUARANTINE_DIR - Quarantine directory name (default: quarantine)"
@@ -108,7 +113,7 @@ start_local_mode() {
     echo "Local Path: $LOCAL_PATH"
     echo ""
     echo "To scan files:"
-    echo "  docker exec <container_name> /app/tmfs-wrapper.sh scan file:$LOCAL_PATH/file.txt"
+    echo "  docker exec <container_name> /app/tmfs-wrapper.sh scan file:$MOUNT_PATH/file.txt"
     echo ""
     echo "Container is ready. Use 'docker exec' to run commands."
     
