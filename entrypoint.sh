@@ -81,8 +81,14 @@ mount_nfs() {
     if [ -n "$NFS_SERVER" ] && [ -n "$NFS_SHARE" ] && [ -n "$MOUNT_PATH" ]; then
         echo "Mounting NFS share..."
         mkdir -p "$MOUNT_PATH"
-        mount -t nfs "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH"
-        echo "NFS mounted at $MOUNT_PATH"
+        
+        # Try mounting with nolock option to avoid statd issues
+        if mount -t nfs -o nolock "$NFS_SERVER:$NFS_SHARE" "$MOUNT_PATH" 2>/dev/null; then
+            echo "NFS mounted successfully at $MOUNT_PATH"
+        else
+            echo "WARNING: Failed to mount NFS, continuing with local directory"
+            echo "You can manually mount NFS or use local directory scanning"
+        fi
     fi
 }
 

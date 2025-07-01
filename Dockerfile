@@ -9,6 +9,7 @@ RUN apk add --no-cache \
     jq \
     findutils \
     nfs-utils \
+    rpcbind \
     sudo \
     && rm -rf /var/cache/apk/*
 
