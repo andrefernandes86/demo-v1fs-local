@@ -266,6 +266,37 @@ docker run -it --rm tmfs-scanner /bin/sh
 - API keys should be provided via environment variables, not command line
 - Consider using Docker secrets for sensitive configuration
 
+## GitHub Actions
+
+This repository includes GitHub Actions for automated malicious file detection and removal:
+
+### Delete Malicious Files Action
+- **File**: `.github/workflows/delete-malicious-files.yml`
+- **Trigger**: Manual or daily at 2 AM UTC
+- **Action**: Scans NFS share and deletes malicious files
+- **Usage**: Go to Actions → Delete Malicious Files → Run workflow
+
+### Quarantine Malicious Files Action
+- **File**: `.github/workflows/quarantine-malicious-files.yml`
+- **Trigger**: Manual or every 6 hours
+- **Actions Available**:
+  - `quarantine`: Move malicious files to quarantine directory
+  - `delete`: Delete malicious files permanently
+  - `report_only`: Generate report without taking action
+- **Usage**: Go to Actions → Quarantine Malicious Files → Run workflow
+
+### Action Configuration
+Both actions accept the following parameters:
+- `nfs_server`: NFS server IP (default: 192.168.200.10)
+- `nfs_share`: NFS share path (default: /mnt/nfs_share)
+- `scanner_endpoint`: Scanner service endpoint (default: 192.168.200.50:50051)
+
+### Security Features
+- **Logging**: All actions are logged and artifacts are retained for 30 days
+- **Summary Reports**: GitHub step summaries provide detailed action reports
+- **File Types Scanned**: .exe, .dll, .bat, .ps1, .vbs, .js, .jar, .msi, .com, .scr
+- **Scheduled Scans**: Automatic scanning prevents manual intervention
+
 ## License
 
 This project is based on the [Trend Vision One File Security Go SDK](https://github.com/trendmicro/tm-v1-fs-golang-sdk) which is licensed under MIT. 

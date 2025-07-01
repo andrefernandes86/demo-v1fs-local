@@ -1,0 +1,147 @@
+name: Delete Malicious Files
+
+on:
+  workflow_dispatch:
+    inputs:
+      nfs_server:
+        description: 'NFS Server IP'
+        required: true
+        default: '192.168.200.10'
+      nfs_share:
+        description: 'NFS Share Path'
+        required: true
+        default: '/mnt/nfs_share'
+      scanner_endpoint:
+        description: 'Scanner Service Endpoint'
+        required: true
+        default: '192.168.200.50:50051'
+      file_path:
+        description: 'Specific file to delete (optional)'
+        required: false
+        default: ''
+      delete_all_malicious:
+        description: 'Delete all malicious files found'
+        required: false
+        default: 'false'
+        type: boolean
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  scan-and-delete:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Build Docker image
+      run: |
+        docker build -t tmfs-scanner .
+        
+    - name: Start NFS container
+      run: |
+        docker run -d \
+          --name tmfs-nfs-delete \
+          --privileged \
+          -e ENDPOINT=${{ github.event.inputs.scanner_endpoint || '192.168.200.50:50051' }} \
+          -e TLS=false \
+          tmfs-scanner nfs
+        
+    - name: Wait for container
+      run: sleep 5
+      
+    - name: Mount NFS share
+      run: |
+        docker exec tmfs-nfs-delete mount -t nfs ${{ github.event.inputs.nfs_server || '192.168.200.10' }}:${{ github.event.inputs.nfs_share || '/mnt/nfs_share' }} /mnt/nfs
+        
+    - name: Scan for malicious files
+      id: scan
+      run: |
+        if [ "${{ github.event.inputs.file_path }}" != "" ]; then
+          # Scan specific file
+          echo "Scanning specific file: ${{ github.event.inputs.file_path }}"
+          SCAN_RESULT=$(docker exec tmfs-nfs-delete /app/tmfs scan "file:/mnt/nfs/${{ github.event.inputs.file_path }}" --tls=false --addr=${{ github.event.inputs.scanner_endpoint || '192.168.200.50:50051' }} 2>&1 || true)
+          echo "scan_result<<EOF" >> $GITHUB_OUTPUT
+          echo "$SCAN_RESULT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          
+          if echo "$SCAN_RESULT" | grep -q "malicious\|threat\|virus\|malware"; then
+            echo "malicious_found=true" >> $GITHUB_OUTPUT
+            echo "malicious_files=${{ github.event.inputs.file_path }}" >> $GITHUB_OUTPUT
+          else
+            echo "malicious_found=false" >> $GITHUB_OUTPUT
+          fi
+        else
+          # Scan all files and find malicious ones
+          echo "Scanning all files in NFS share..."
+          MALICIOUS_FILES=""
+          FILES_TO_SCAN=$(docker exec tmfs-nfs-delete find /mnt/nfs -type f -name "*.exe" -o -name "*.dll" -o -name "*.bat" -o -name "*.ps1" -o -name "*.vbs" -o -name "*.js" -o -name "*.jar" | head -20)
+          
+          for file in $FILES_TO_SCAN; do
+            echo "Scanning: $file"
+            SCAN_RESULT=$(docker exec tmfs-nfs-delete /app/tmfs scan "file:$file" --tls=false --addr=${{ github.event.inputs.scanner_endpoint || '192.168.200.50:50051' }} 2>&1 || true)
+            
+            if echo "$SCAN_RESULT" | grep -q "malicious\|threat\|virus\|malware"; then
+              MALICIOUS_FILES="$MALICIOUS_FILES $file"
+              echo "Malicious file detected: $file"
+            fi
+          done
+          
+          if [ -n "$MALICIOUS_FILES" ]; then
+            echo "malicious_found=true" >> $GITHUB_OUTPUT
+            echo "malicious_files=$MALICIOUS_FILES" >> $GITHUB_OUTPUT
+          else
+            echo "malicious_found=false" >> $GITHUB_OUTPUT
+          fi
+        fi
+        
+    - name: Delete malicious files
+      if: steps.scan.outputs.malicious_found == 'true'
+      run: |
+        echo "Deleting malicious files..."
+        MALICIOUS_FILES="${{ steps.scan.outputs.malicious_files }}"
+        
+        for file in $MALICIOUS_FILES; do
+          echo "Deleting: $file"
+          docker exec tmfs-nfs-delete rm -f "$file"
+          
+          # Log deletion
+          echo "DELETED: $file at $(date)" >> /tmp/malicious_files_deleted.log
+        done
+        
+        # Create summary
+        echo "## Malicious Files Deleted" >> $GITHUB_STEP_SUMMARY
+        echo "The following malicious files were deleted:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        for file in $MALICIOUS_FILES; do
+          echo "- \`$file\`" >> $GITHUB_STEP_SUMMARY
+        done
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Deletion completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+        
+    - name: No malicious files found
+      if: steps.scan.outputs.malicious_found == 'false'
+      run: |
+        echo "## Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "✅ No malicious files were detected." >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Scan completed at: $(date)" >> $GITHUB_STEP_SUMMARY
+        
+    - name: Cleanup
+      if: always()
+      run: |
+        docker stop tmfs-nfs-delete || true
+        docker rm tmfs-nfs-delete || true
+        
+    - name: Upload deletion log
+      if: steps.scan.outputs.malicious_found == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: malicious-files-deleted
+        path: /tmp/malicious_files_deleted.log
+        retention-days: 30 
