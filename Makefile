@@ -116,5 +116,16 @@ nfs-quick:
 	@echo "Quick NFS scan example:"
 	@echo "1. Start container: docker run -d --name tmfs-nfs --privileged tmfs-scanner nfs"
 	@echo "2. Mount NFS: docker exec tmfs-nfs mount -t nfs 192.168.200.10:/mnt/nfs_share /mnt/nfs"
-	@echo "3. Scan files: docker exec tmfs-nfs /app/tmfs scan file:/mnt/nfs/filename.txt --tls=false --addr=my-release-visionone-filesecurity-scanner:50051"
-	@echo "4. Cleanup: docker stop tmfs-nfs && docker rm tmfs-nfs" 
+	@echo "3. Scan files: docker exec tmfs-nfs /app/tmfs scan file:/mnt/nfs/filename.txt --tls=false --addr=192.168.200.50:50051"
+	@echo "4. Cleanup: docker stop tmfs-nfs && docker rm tmfs-nfs"
+
+# Real-time monitoring
+monitor:
+	@echo "Starting real-time malicious file monitoring (quarantine mode)..."
+	chmod +x monitor-and-remove.sh
+	./monitor-and-remove.sh
+
+auto-delete:
+	@echo "Starting automatic malicious file deletion..."
+	chmod +x auto-delete-malware.sh
+	./auto-delete-malware.sh 

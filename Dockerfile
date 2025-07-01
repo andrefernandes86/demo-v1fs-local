@@ -34,8 +34,9 @@ WORKDIR /app
 COPY --from=builder /app/examples/client /app/tmfs
 COPY --from=builder /app/examples/scanfiles /app/scanfiles
 
-# Make binaries executable
-RUN chmod +x /app/tmfs /app/scanfiles
+# Make binaries executable and set proper ownership
+RUN chmod +x /app/tmfs /app/scanfiles && \
+    chown tmfs:tmfs /app/tmfs /app/scanfiles
 
 # Create mount points for NFS shares
 RUN mkdir -p /mnt/nfs && chown tmfs:tmfs /mnt/nfs
