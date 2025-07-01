@@ -171,10 +171,14 @@ monitor_directory() {
     echo "Action: ${ACTION:-quarantine}"
     echo ""
     
-    # Mount NFS if configured
-    if ! mount_nfs; then
-        echo "❌ Failed to mount NFS, exiting"
-        exit 1
+    # Mount NFS if configured (skip if using volume mounts)
+    if [ -n "$NFS_SERVER" ] && [ -n "$NFS_SHARE" ]; then
+        if ! mount_nfs; then
+            echo "❌ Failed to mount NFS, exiting"
+            exit 1
+        fi
+    else
+        echo "ℹ️  Using volume mount, skipping NFS mounting"
     fi
     
     # Create quarantine directory
