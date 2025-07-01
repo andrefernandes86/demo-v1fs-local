@@ -11,7 +11,9 @@ WORKDIR /app
 RUN git clone https://github.com/trendmicro/tm-v1-fs-golang-sdk.git .
 
 # Build the client tools
-RUN make build
+RUN make build && \
+    ls -la /app/examples/ && \
+    echo "Build completed successfully"
 
 # Create final runtime image
 FROM alpine:latest
@@ -36,7 +38,8 @@ COPY --from=builder /app/examples/scanfiles /app/scanfiles
 
 # Make binaries executable and set proper ownership
 RUN chmod +x /app/tmfs /app/scanfiles && \
-    chown tmfs:tmfs /app/tmfs /app/scanfiles
+    chown tmfs:tmfs /app/tmfs /app/scanfiles && \
+    ls -la /app/tmfs /app/scanfiles
 
 # Create mount points for NFS shares
 RUN mkdir -p /mnt/nfs && chown tmfs:tmfs /mnt/nfs
@@ -45,7 +48,8 @@ RUN mkdir -p /mnt/nfs && chown tmfs:tmfs /mnt/nfs
 COPY tmfs-wrapper.sh /app/tmfs-wrapper.sh
 COPY entrypoint.sh /app/entrypoint.sh
 COPY realtime-monitor.sh /app/realtime-monitor.sh
-RUN chmod +x /app/tmfs-wrapper.sh /app/entrypoint.sh /app/realtime-monitor.sh
+RUN chmod +x /app/tmfs-wrapper.sh /app/entrypoint.sh /app/realtime-monitor.sh && \
+    chown tmfs:tmfs /app/tmfs-wrapper.sh /app/entrypoint.sh /app/realtime-monitor.sh
 
 # Switch to non-root user
 USER tmfs
