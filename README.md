@@ -399,9 +399,29 @@ docker run -d \
 
 ### Available Actions
 
-- **`quarantine`** (default): Move malicious files to a quarantine directory
-- **`delete`**: Permanently delete malicious files
-- **`report_only`**: Only report malicious files, take no action
+#### **`quarantine`** (Default Action)
+- **What it does**: Moves malicious files to a designated quarantine directory
+- **File handling**: Files are renamed with timestamp and moved to quarantine folder
+- **Recovery**: Quarantined files can be restored if they're false positives
+- **Safety**: Files are isolated but not permanently lost
+- **Logging**: All quarantine actions are logged with timestamps
+- **Example**: `malware.exe` → `quarantine/malware.exe.quarantined_20241220_143022`
+
+#### **`delete`** (Permanent Removal)
+- **What it does**: Permanently deletes malicious files from the file system
+- **File handling**: Files are immediately removed using `rm -f`
+- **Recovery**: **Files cannot be recovered** - deletion is permanent
+- **Safety**: Use with caution - ensure your scanner is accurate
+- **Logging**: All deletion actions are logged for audit purposes
+- **Example**: `malware.exe` → **permanently deleted**
+
+#### **`report_only`** (Monitoring Only)
+- **What it does**: Only reports malicious files without taking any action
+- **File handling**: Files remain untouched in their original location
+- **Recovery**: Files are never moved or deleted
+- **Safety**: Safest option for testing and monitoring
+- **Logging**: All detections are logged for analysis
+- **Example**: `malware.exe` → **reported but left in place**
 
 ### Monitor Parameters
 
@@ -411,12 +431,41 @@ docker run -d \
 - **`--scan-interval=<seconds>`**: Scan interval in seconds (default: 30)
 - **`--quarantine-dir=<dir>`**: Quarantine directory name (default: quarantine)
 
-### Recursive Scanning
+### How Real-time Monitoring Works
 
-The monitoring system automatically scans all subdirectories recursively and focuses on executable and script files:
-- `.exe`, `.dll`, `.bat`, `.ps1`, `.vbs`, `.js`, `.jar`
-- `.msi`, `.com`, `.scr`, `.pif`, `.cmd`, `.reg`
-- `.wsf`, `.hta`, `.lnk`
+The monitoring system operates continuously with the following workflow:
+
+#### **1. File Detection**
+- **Scan Interval**: Checks for new files every 30 seconds (configurable)
+- **File Types**: Monitors executable and script files that are commonly used for malware
+- **Recursive Scanning**: Automatically scans all subdirectories in the NFS share
+- **New File Detection**: Uses file timestamps to identify newly added files
+
+#### **2. File Types Monitored**
+The system focuses on these potentially malicious file types:
+- **Executables**: `.exe`, `.dll`, `.com`, `.scr`, `.pif`, `.msi`
+- **Scripts**: `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.wsf`, `.hta`
+- **Java**: `.jar`
+- **Registry**: `.reg`
+- **Shortcuts**: `.lnk`
+
+#### **3. Scanning Process**
+1. **Mount NFS**: Automatically mounts the NFS share if not already mounted
+2. **Find New Files**: Uses `find` command to locate new files with monitored extensions
+3. **Scan Each File**: Sends each file to the Trend Vision One scanner
+4. **Analyze Results**: Checks scan results for malicious indicators
+5. **Take Action**: Executes the specified action (quarantine/delete/report)
+6. **Log Actions**: Records all activities for audit purposes
+
+#### **4. Action Execution**
+- **Quarantine**: Moves file to quarantine directory with timestamp
+- **Delete**: Permanently removes file from file system
+- **Report**: Logs detection without modifying the file
+
+#### **5. Logging and Audit**
+- **Action Logs**: All actions are logged to `/tmp/malicious_files_*.log`
+- **Console Output**: Real-time status updates with colored output
+- **Error Handling**: Graceful handling of mount failures and scan errors
 
 ### Using Docker Compose
 ```bash
@@ -438,6 +487,41 @@ docker-compose up tmfs-scanner-report
 - **Logging**: All actions are logged for audit purposes
 - **NFS Integration**: Works with your NFS share (192.168.200.10/mnt/nfs_share)
 - **Scanner Integration**: Uses your scanner endpoint (192.168.200.50:50051)
+
+### Monitoring Logs and Troubleshooting
+
+#### **Viewing Monitoring Logs**
+```bash
+# View real-time monitoring logs
+docker logs tmfs-monitor
+
+# Follow logs in real-time
+docker logs -f tmfs-monitor
+
+# View specific action logs
+docker exec tmfs-monitor cat /tmp/malicious_files_quarantined.log
+docker exec tmfs-monitor cat /tmp/malicious_files_deleted.log
+docker exec tmfs-monitor cat /tmp/malicious_files_reported.log
+```
+
+#### **Monitoring Status Indicators**
+- 🟢 **Green**: File is clean
+- 🟡 **Yellow**: Warning or skipped file
+- 🔴 **Red**: Malicious file detected
+- 🚨 **Alert**: Action taken (quarantine/delete)
+
+#### **Common Monitoring Issues**
+1. **NFS Mount Fails**: Check NFS server connectivity and permissions
+2. **Scanner Connection**: Verify endpoint is accessible and scanner is running
+3. **Permission Denied**: Ensure container has proper NFS mount permissions
+4. **No Files Detected**: Check if files have monitored extensions
+
+#### **Monitoring Best Practices**
+- **Start with `report_only`**: Test monitoring without taking action
+- **Monitor logs**: Regularly check action logs for false positives
+- **Adjust scan interval**: Increase interval for large file systems
+- **Backup quarantine**: Regularly backup quarantine directory
+- **Test scanner**: Verify scanner accuracy before using delete action
 
 ## License
 
