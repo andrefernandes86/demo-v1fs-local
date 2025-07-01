@@ -55,5 +55,8 @@ fi
 # Add endpoint
 ARGS="$ARGS -addr=$ENDPOINT"
 
+# Debug: Show what we're executing
+echo "Debug: Executing /app/tmfs $ARGS $@"
+
 # Execute the command
-exec /app/tmfs "$@" $ARGS 
+exec /app/tmfs $ARGS "$@" 
