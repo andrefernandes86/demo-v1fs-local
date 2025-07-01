@@ -13,6 +13,57 @@ ACTIVE_CONTENT=${ACTIVE_CONTENT:-"false"}
 TAGS=${TAGS:-""}
 DIGEST=${DIGEST:-"true"}
 
+# Parse command line arguments
+SCAN_ARGS=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --endpoint=*)
+            ENDPOINT="${1#*=}"
+            shift
+            ;;
+        --tls=*)
+            TLS="${1#*=}"
+            shift
+            ;;
+        --region=*)
+            REGION="${1#*=}"
+            shift
+            ;;
+        --apikey=*)
+            APIKEY="${1#*=}"
+            shift
+            ;;
+        --pml)
+            PML="true"
+            shift
+            ;;
+        --feedback)
+            FEEDBACK="true"
+            shift
+            ;;
+        --verbose)
+            VERBOSE="true"
+            shift
+            ;;
+        --active-content)
+            ACTIVE_CONTENT="true"
+            shift
+            ;;
+        --tag=*)
+            TAGS="${1#*=}"
+            shift
+            ;;
+        --digest=*)
+            DIGEST="${1#*=}"
+            shift
+            ;;
+        *)
+            SCAN_ARGS="$SCAN_ARGS $1"
+            shift
+            ;;
+    esac
+done
+
 # Build command arguments
 ARGS=""
 
@@ -56,7 +107,7 @@ fi
 ARGS="$ARGS -addr=$ENDPOINT"
 
 # Debug: Show what we're executing
-echo "Debug: Executing /app/tmfs $ARGS $@"
+echo "Debug: Executing /app/tmfs $ARGS $SCAN_ARGS"
 
 # Execute the command
-exec /app/tmfs $ARGS "$@" 
+exec /app/tmfs $ARGS $SCAN_ARGS 
