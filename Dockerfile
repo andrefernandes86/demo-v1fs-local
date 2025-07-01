@@ -26,10 +26,6 @@ RUN echo '#!/bin/bash' > /app/tmfs && \
 COPY entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Copy monitoring script
-COPY realtime-monitor.sh /app/realtime-monitor.sh
-RUN chmod +x /app/realtime-monitor.sh
-
 # Create scan directory
 RUN mkdir -p /mnt/scan
 
