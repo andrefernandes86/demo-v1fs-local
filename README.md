@@ -20,8 +20,8 @@ docker run -d \
   --privileged \
   -e TM_ENDPOINT=192.168.200.50:30230 \
   -e TM_TLS=false \
-  -e NFS_SERVER=192.168.200.50 \
-  -e NFS_SHARE=/mnt/nfs-share \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
   -e MOUNT_PATH=/mnt/nfs \
   -e ACTION=quarantine \
   -v /mnt/nfs:/mnt/nfs:shared \
@@ -51,8 +51,8 @@ docker ps | grep tmfs-monitor
 docker run --rm \
   -e TM_ENDPOINT=192.168.200.50:30230 \
   -e TM_TLS=false \
-  -e NFS_SERVER=192.168.200.50 \
-  -e NFS_SHARE=/mnt/nfs-share \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
   -e MOUNT_PATH=/mnt/nfs \
   -v /mnt/nfs:/mnt/nfs:shared \
   tmfs-scanner scan /mnt/nfs/file.txt
@@ -63,8 +63,8 @@ docker run --rm \
 docker run --rm \
   -e TM_ENDPOINT=192.168.200.50:30230 \
   -e TM_TLS=false \
-  -e NFS_SERVER=192.168.200.50 \
-  -e NFS_SHARE=/mnt/nfs-share \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
   -e MOUNT_PATH=/mnt/nfs \
   -v /mnt/nfs:/mnt/nfs:shared \
   tmfs-scanner scan-dir /mnt/nfs
@@ -73,7 +73,7 @@ docker run --rm \
 ### Using Makefile
 ```bash
 # Start monitoring
-make monitor NFS_SERVER=192.168.200.50 NFS_SHARE=/mnt/nfs-share MOUNT_PATH=/mnt/nfs TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false
+make monitor NFS_SERVER=192.168.200.10 NFS_SHARE=/mnt/nfs_share MOUNT_PATH=/mnt/nfs TM_ENDPOINT=192.168.200.50:30230 TM_TLS=false
 
 # Stop all containers
 make stop
@@ -88,8 +88,8 @@ make logs
 |----------|-------------|---------|
 | `TM_ENDPOINT` | Trend Micro endpoint | `192.168.200.50:30230` |
 | `TM_TLS` | Enable TLS | `false` |
-| `NFS_SERVER` | NFS server IP | `192.168.200.50` |
-| `NFS_SHARE` | NFS share path | `/mnt/nfs-share` |
+| `NFS_SERVER` | NFS server IP | `192.168.200.10` |
+| `NFS_SHARE` | NFS share path | `/mnt/nfs_share` |
 | `MOUNT_PATH` | Mount point | `/mnt/nfs` |
 | `ACTION` | Action for malicious files | `quarantine` |
 | `SCAN_INTERVAL` | Monitoring interval (seconds) | `30` |
@@ -143,10 +143,10 @@ docker run --privileged ...
 ### NFS Mount Issues
 ```bash
 # Check NFS server accessibility
-showmount -e 192.168.200.50
+showmount -e 192.168.200.10
 
 # Test mount manually
-sudo mount -t nfs 192.168.200.50:/mnt/nfs-share /mnt/test
+sudo mount -t nfs 192.168.200.10:/mnt/nfs_share /mnt/test
 ```
 
 ### Permission Issues

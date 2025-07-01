@@ -6,7 +6,7 @@ echo "=== NFS Scanner Setup ==="
 echo ""
 
 # Default values
-NFS_SERVER=${NFS_SERVER:-"192.168.200.50"}
+NFS_SERVER=${NFS_SERVER:-"192.168.200.10"}
 NFS_SHARE=${NFS_SHARE:-"/mnt/nfs_share"}
 MOUNT_PATH=${MOUNT_PATH:-"/mnt/nfs"}
 CONTAINER_NAME=${CONTAINER_NAME:-"tmfs-monitor"}
