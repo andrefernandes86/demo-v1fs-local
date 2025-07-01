@@ -6,7 +6,7 @@ services:
     container_name: tmfs-scanner
     privileged: true  # Required for NFS mounting
     environment:
-      - ENDPOINT=192.168.200.50:50051
+      - ENDPOINT=192.168.200.50:30230
       - TLS=false
       - PML=false
       - FEEDBACK=false
@@ -35,7 +35,7 @@ services:
     container_name: tmfs-scanner-delete
     privileged: true  # Required for NFS mounting
     environment:
-      - ENDPOINT=192.168.200.50:50051
+      - ENDPOINT=192.168.200.50:30230
       - TLS=false
       - PML=false
       - FEEDBACK=false
@@ -63,7 +63,7 @@ services:
     container_name: tmfs-scanner-report
     privileged: true  # Required for NFS mounting
     environment:
-      - ENDPOINT=192.168.200.50:50051
+      - ENDPOINT=192.168.200.50:30230
       - TLS=false
       - PML=false
       - FEEDBACK=false
@@ -90,7 +90,7 @@ services:
     build: .
     container_name: tmfs-scan
     environment:
-      - ENDPOINT=192.168.200.50:50051
+      - ENDPOINT=192.168.200.50:30230
       - TLS=false
       - PML=false
       - FEEDBACK=false

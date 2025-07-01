@@ -338,7 +338,7 @@ docker run -d \
   --name tmfs-monitor \
   --privileged \
   --network host \
-  -e ENDPOINT=192.168.200.50:50051 \
+  -e ENDPOINT=192.168.200.50:30230 \
   -e TLS=false \
   -e NFS_SERVER=192.168.200.10 \
   -e NFS_SHARE=/mnt/nfs_share \
@@ -350,7 +350,7 @@ docker run -d \
   --name tmfs-monitor \
   --privileged \
   --network host \
-  -e ENDPOINT=192.168.200.50:50051 \
+  -e ENDPOINT=192.168.200.50:30230 \
   -e TLS=false \
   -e NFS_SERVER=192.168.200.10 \
   -e NFS_SHARE=/mnt/nfs_share \
