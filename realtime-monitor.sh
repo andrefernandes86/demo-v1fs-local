@@ -110,7 +110,7 @@ while true; do
                 fi
                 # Scan the file using CLI
                 echo "    🔍 Scanning..."
-                SCAN_RESULT=$(/app/tmfs-cli-wrapper.sh scan "file:$file" 2>&1 || true)
+                SCAN_RESULT=$(/app/tmfs scan "$file" 2>&1 || true)
                 
                 # Parse CLI scan result for malicious detection
                 # CLI typically returns JSON or structured output

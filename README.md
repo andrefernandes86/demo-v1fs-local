@@ -1,19 +1,18 @@
 # Trend Vision One File Security Scanner
 
-This Docker container provides a ready-to-use environment for the Trend Vision One™ CLI with local path support and configurable endpoints.
+This Docker container provides a ready-to-use environment for the Trend Vision One™ CLI with NFS support and automatic malware deletion, based on the working implementation from [tools-v1fs-scanner](https://github.com/andrefernandes86/tools-v1fs-scanner.git).
 
 
 
 ## Features
 
-- **CLI-based**: Uses official Trend Vision One CLI instead of Go SDK
-- **Local Path Support**: Monitor local host paths directly without NFS
-- **Configurable Endpoints**: Specify custom Vision One regions or endpoints
-- **TLS Support**: Configurable TLS encryption
-- **Multiple Scan Modes**: Single file, directory, and real-time monitoring
-- **Environment Variable Configuration**: Easy configuration via environment variables
-- **Security**: Runs as non-root user
-- **Real-time Monitoring**: Continuous file monitoring with configurable actions
+- **CLI-based**: Uses official Trend Vision One CLI
+- **NFS Support**: Mount and scan files from NFS shares
+- **Automatic Deletion**: Automatically delete malicious files
+- **Comprehensive Logging**: Detailed logs of all scan actions
+- **Simple Configuration**: Easy setup with environment variables
+- **Security**: Designed for secure, trusted environments
+- **Real-time Scanning**: Scan and clean files in real-time
 
 ## Prerequisites
 

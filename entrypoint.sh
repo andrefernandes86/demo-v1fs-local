@@ -99,7 +99,7 @@ scan_directory() {
 # Function to start monitoring
 start_monitoring() {
     echo "🛡️ Starting real-time monitoring..."
-    exec /app/realtime-monitor-cli.sh
+    exec /app/realtime-monitor.sh
 }
 
 # Function to start local path mode
@@ -108,7 +108,7 @@ start_local_mode() {
     echo "Local Path: $LOCAL_PATH"
     echo ""
     echo "To scan files:"
-    echo "  docker exec <container_name> /app/tmfs-cli-wrapper.sh scan file:$LOCAL_PATH/file.txt"
+    echo "  docker exec <container_name> /app/tmfs-wrapper.sh scan file:$LOCAL_PATH/file.txt"
     echo ""
     echo "Container is ready. Use 'docker exec' to run commands."
     
@@ -145,6 +145,6 @@ case "$1" in
         ;;
     *)
         # Pass through to CLI wrapper for other commands
-        /app/tmfs-cli-wrapper.sh "$@"
+        /app/tmfs-wrapper.sh "$@"
         ;;
 esac 
