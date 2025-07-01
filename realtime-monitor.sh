@@ -56,11 +56,22 @@ esac
 # Mount NFS share if not already mounted
 if ! mountpoint -q /mnt/nfs; then
     echo "📁 Mounting NFS share..."
-    if mount -t nfs "$NFS_SERVER:$NFS_SHARE" /mnt/nfs; then
-        print_status "NFS share mounted successfully"
+    # Try to mount with sudo if available, otherwise try direct mount
+    if command -v sudo >/dev/null 2>&1; then
+        if sudo mount -t nfs "$NFS_SERVER:$NFS_SHARE" /mnt/nfs; then
+            print_status "NFS share mounted successfully with sudo"
+        else
+            print_error "Failed to mount NFS share with sudo"
+            exit 1
+        fi
     else
-        print_error "Failed to mount NFS share"
-        exit 1
+        if mount -t nfs "$NFS_SERVER:$NFS_SHARE" /mnt/nfs; then
+            print_status "NFS share mounted successfully"
+        else
+            print_error "Failed to mount NFS share"
+            print_error "Note: Container needs to run with --privileged flag"
+            exit 1
+        fi
     fi
 fi
 

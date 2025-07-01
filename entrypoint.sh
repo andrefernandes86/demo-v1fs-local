@@ -83,19 +83,23 @@ elif [ "$1" = "monitor" ]; then
                 ;;
         esac
     done
-    exec /app/realtime-monitor.sh
+    # Switch to root for NFS operations
+    exec su -c "/app/realtime-monitor.sh" root
 elif [ "$1" = "quarantine" ]; then
     shift
     ACTION=quarantine
-    exec /app/realtime-monitor.sh
+    # Switch to root for NFS operations
+    exec su -c "/app/realtime-monitor.sh" root
 elif [ "$1" = "delete" ]; then
     shift
     ACTION=delete
-    exec /app/realtime-monitor.sh
+    # Switch to root for NFS operations
+    exec su -c "/app/realtime-monitor.sh" root
 elif [ "$1" = "report" ]; then
     shift
     ACTION=report_only
-    exec /app/realtime-monitor.sh
+    # Switch to root for NFS operations
+    exec su -c "/app/realtime-monitor.sh" root
 else
     echo "Usage:"
     echo "  docker run <image> nfs                    # Start container with NFS support"
