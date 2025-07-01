@@ -16,16 +16,10 @@ RUN apk add --no-cache \
 WORKDIR /app
 
 # Download and install Trend Vision One CLI
-RUN wget -O /app/tmfs https://github.com/trendmicro/visionone-cli/releases/latest/download/tmcli-linux-amd64 \
-    && chmod +x /app/tmfs
-
-# Copy scan and delete script
-COPY scan_and_delete.sh /app/scan_and_delete.sh
-RUN chmod +x /app/scan_and_delete.sh
-
-# Copy wrapper script
-COPY tmfs-wrapper.sh /app/tmfs-wrapper.sh
-RUN chmod +x /app/tmfs-wrapper.sh
+# Note: You need to download the CLI manually from Trend Micro Vision One console
+# and place it in the build context as 'tmfs' file
+COPY tmfs /app/tmfs
+RUN chmod +x /app/tmfs
 
 # Copy entrypoint script
 COPY entrypoint.sh /app/entrypoint.sh
@@ -39,4 +33,4 @@ RUN chmod +x /app/realtime-monitor.sh
 RUN mkdir -p /mnt/scan
 
 # Set entrypoint
-ENTRYPOINT ["/app/scan_and_delete.sh"] 
+ENTRYPOINT ["/app/entrypoint.sh"] 

@@ -9,15 +9,27 @@ A Docker container for real-time malware scanning and quarantine using Trend Mic
 - NFS server running at `192.168.200.50:/mnt/nfs-share`
 - Trend Micro Vision One endpoint accessible
 
-### 1. Clone and Build
+### 1. Clone and Download CLI
 
 ```bash
 git clone https://github.com/andrefernandes86/demo-v1fs-local.git
 cd demo-v1fs-local
+
+# Download the Trend Micro Vision One CLI
+./download-cli.sh
+
+# Follow the instructions to download the CLI from your Vision One console
+# and place it in this directory as 'tmfs'
+```
+
+### 2. Build the Docker Image
+
+```bash
+# Build the scanner image
 docker build -t tmfs-scanner .
 ```
 
-### 2. Start Real-time Monitoring
+### 3. Start Real-time Monitoring
 
 ```bash
 docker run -d \
@@ -33,7 +45,7 @@ docker run -d \
   tmfs-scanner monitor
 ```
 
-### 3. Check Status
+### 4. Check Status
 
 ```bash
 # View logs
@@ -58,6 +70,7 @@ docker ps | grep tmfs-monitor
 1. **Docker**: Docker Engine 20.10+ installed
 2. **NFS Server**: Running at `192.168.200.50:/mnt/nfs-share`
 3. **Trend Micro Endpoint**: Accessible at `192.168.200.50:30230`
+4. **Trend Micro Vision One CLI**: Downloaded from your Vision One console
 
 ## 🎯 Usage Examples
 
@@ -155,6 +168,7 @@ demo-v1fs-local/
 ├── entrypoint.sh          # Container entrypoint script
 ├── realtime-monitor.sh    # Real-time monitoring script
 ├── test.sh               # Comprehensive test script
+├── download-cli.sh        # CLI download helper script
 ├── README.md             # This documentation
 ├── .gitignore           # Git ignore rules
 └── .dockerignore        # Docker ignore rules
