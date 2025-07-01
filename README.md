@@ -1,582 +1,425 @@
 # Trend Vision One File Security Docker Container
 
-This Docker container provides a ready-to-use environment for the Trend Vision One™ File Security Go SDK with NFS support and configurable endpoints.
+This Docker container provides a ready-to-use environment for the Trend Vision One™ File Security with NFS support and configurable endpoints. **Two versions available:**
 
-## Features
+- **Go SDK Version** (Original): For local endpoints and custom deployments
+- **CLI Version** (New): For cloud Vision One services with official CLI
+
+## 🚀 Quick Start
+
+### Choose Your Version
+
+#### **Option 1: Go SDK Version (Local Endpoints)**
+```bash
+# Build and test
+make build
+make test
+
+# Run with local endpoint
+docker run --rm \
+  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TLS=false \
+  -v /path/to/file:/app/file:ro \
+  tmfs-scanner scan /app/file
+```
+
+#### **Option 2: CLI Version (Cloud Vision One)**
+```bash
+# Setup environment
+make -f Makefile.cli setup
+# Edit .env file with your TM_API_KEY
+
+# Build and test
+make -f Makefile.cli build
+make -f Makefile.cli test-local
+
+# Run with cloud endpoint
+docker run --rm \
+  --env-file .env \
+  -v /path/to/file:/app/file:ro \
+  tmfs-cli-scanner scan /app/file
+```
+
+## 📋 Features
 
 - **NFS Support**: Mount and scan files from NFS shares
 - **Configurable Endpoints**: Specify custom File Security service endpoints
 - **TLS Support**: Configurable TLS encryption
-- **Multiple Scan Modes**: Single file and batch file scanning
+- **Multiple Scan Modes**: Single file, directory, and real-time monitoring
+- **Action Modes**: Quarantine, delete, or report malicious files
 - **Environment Variable Configuration**: Easy configuration via environment variables
 - **Security**: Runs as non-root user
+- **Real-time Monitoring**: Continuous file monitoring with configurable actions
 
-## Quick Start
+## 🛠️ Building the Application
 
-### Building the Container
+### Prerequisites
+- Docker Engine 20.10+
+- Docker Compose (optional)
+- NFS Server (for NFS functionality)
 
+### Build Commands
+
+#### **Go SDK Version (Local Endpoints)**
 ```bash
 # Build the container
 docker build -t tmfs-scanner .
 
 # Or using docker-compose
 docker-compose build
+
+# Or using Makefile
+make build
 ```
 
-### Basic Usage
-
-#### 1. Scan a Single File
-
+#### **CLI Version (Cloud Vision One)**
 ```bash
-# Scan a local file
-docker run --rm tmfs-scanner scan file:./eicar.com.txt \
-  --tls=false \
-  --endpoint=192.168.200.50:50051
+# Build the CLI container
+docker build -f Dockerfile.cli -t tmfs-cli-scanner .
 
-# Using environment variables
-docker run --rm \
-  -e ENDPOINT=192.168.200.50:50051 \
-  -e TLS=false \
-  -v $(pwd)/files:/app/files:ro \
-  tmfs-scanner scan file:/app/files/eicar.com.txt
+# Or using docker-compose
+docker-compose -f docker-compose.cli.yml build
+
+# Or using Makefile
+make -f Makefile.cli build
 ```
 
-#### 2. Scan Multiple Files
-
-```bash
-# Scan a directory
-docker run --rm \
-  -e ENDPOINT=192.168.200.50:50051 \
-  -e TLS=false \
-  -v $(pwd)/files:/app/files:ro \
-  tmfs-scanner scanfiles -path=/app/files -good
-```
-
-#### 3. NFS Support Mode
-
-```bash
-# Start container with NFS support
-docker run -d \
-  --name tmfs-nfs \
-  --privileged \
-  -e ENDPOINT=192.168.200.50:50051 \
-  -e TLS=false \
-  -v nfs-share:/mnt/nfs:shared \
-  tmfs-scanner nfs
-
-# Mount NFS share and scan files
-docker exec tmfs-nfs mount -t nfs 192.168.200.10:/mnt/nfs_share /mnt/nfs
-docker exec tmfs-nfs /app/tmfs scan file:/mnt/nfs/suspicious-file.exe --tls=false --addr=192.168.200.50:50051
-```
-
-## Docker Compose Usage
-
-### Start with NFS Support
-
-```bash
-# Start the scanner with NFS support
-docker-compose up tmfs-scanner -d
-
-# Execute scans in the running container
-docker-compose exec tmfs-scanner /app/tmfs scan file:/app/files/eicar.com.txt --tls=false --addr=my-release-visionone-filesecurity-scanner:50051
-```
-
-### Run a Single Scan
-
-```bash
-# Run a single scan and exit
-docker-compose run --rm tmfs-scan
-```
-
-## Configuration
-
-### Vision One Regions and API Key
-
-The Trend Vision One File Security service configuration depends on your deployment type:
-
-#### **Local Deployment (No Region/API Key Required)**
-For local endpoints like `192.168.200.50:30230`:
-- **No API Key needed**
-- **No Region needed**
-- Just specify the `ENDPOINT` and set `TLS=false`
-
-#### **Kubernetes Deployment Requirements**
-For Kubernetes-hosted scanners, ensure proper port publishing:
-
-```bash
-# Check if NodePort service is configured
-kubectl get svc my-release-visionone-filesecurity-scanner -n visionone-filesecurity
-
-# Verify NodePort is accessible
-telnet 192.168.200.50 30230
-
-# If using LoadBalancer, check external IP
-kubectl get svc -n visionone-filesecurity -o wide
-```
-
-**Required Kubernetes Configuration:**
-- **Service Type**: `NodePort` or `LoadBalancer`
-- **Port Mapping**: `50051:30230/TCP` (internal:external)
-- **Node Access**: Ensure nodes are accessible from Docker host
-- **Firewall**: Allow traffic on NodePort (30230)
-
-#### **Cloud Vision One Deployment (Region/API Key Required)**
-For cloud-based Vision One services:
-- **API Key**: A valid API key must be provided via `APIKEY` environment variable or `TM_AM_AUTH_KEY`
-- **Region**: Must be one of the supported Vision One regions
-
-#### Supported Regions:
-| Region | Description |
-|--------|-------------|
-| `us-east-1` | US East |
-| `eu-central-1` | Europe Central |
-| `ap-southeast-1` | Asia Pacific Southeast 1 |
-| `ap-southeast-2` | Asia Pacific Southeast 2 |
-| `ap-northeast-1` | Asia Pacific Northeast 1 |
-| `ap-south-1` | Asia Pacific South 1 |
-| `me-central-1` | Middle East Central 1 |
+## 🔧 Configuration
 
 ### Environment Variables
 
+#### **Go SDK Version**
 | Variable | Description | Default | Example |
 |----------|-------------|---------|---------|
 | `ENDPOINT` | File Security service endpoint | `localhost:50051` | `my-release-visionone-filesecurity-scanner:50051` |
 | `TLS` | Enable/disable TLS | `true` | `false` |
-| `REGION` | Service region (cloud only) | `` | `us-east-1`, `eu-central-1`, `ap-southeast-1`, `ap-southeast-2`, `ap-northeast-1`, `ap-south-1`, `me-central-1` |
+| `REGION` | Service region (cloud only) | `` | `us-east-1` |
 | `APIKEY` | API key for authentication (cloud only) | `` | `your-api-key` |
-| `PML` | Enable PML detection | `false` | `true` |
-| `FEEDBACK` | Enable SPN feedback | `false` | `true` |
-| `VERBOSE` | Enable verbose output | `false` | `true` |
-| `ACTIVE_CONTENT` | Enable active content detection | `false` | `true` |
-| `TAGS` | Comma-separated tags | `` | `prod,scan` |
-| `DIGEST` | Enable digest calculation | `true` | `false` |
-| `TM_AM_SCAN_TIMEOUT_SECS` | Scan timeout in seconds | `300` | `600` |
-| `TM_AM_DISABLE_CERT_VERIFY` | Disable certificate verification | `0` | `1` |
+| `ACTION` | Action for malicious files | `quarantine` | `delete`, `report_only` |
+| `SCAN_INTERVAL` | Monitoring interval (seconds) | `30` | `60` |
+| `QUARANTINE_DIR` | Quarantine directory name | `quarantine` | `malware_quarantine` |
 
-### Command Line Options
+#### **CLI Version**
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `TM_API_KEY` | Trend Vision One API key | - | **Yes** (for cloud) |
+| `TM_REGION` | Vision One region | `us-east-1` | No |
+| `TM_ENDPOINT` | Custom endpoint URL | - | No |
+| `TM_TLS` | Enable TLS | `true` | No |
+| `TM_TIMEOUT` | Request timeout (seconds) | `300` | No |
+| `ACTION` | Action for malicious files | `quarantine` | No |
+| `SCAN_INTERVAL` | Monitoring interval (seconds) | `30` | No |
+| `QUARANTINE_DIR` | Quarantine directory name | `quarantine` | No |
 
-The container supports all command line options from the original SDK:
+## 🗂️ NFS Share Mapping
 
-```bash
-# Available options for scan command
-docker run tmfs-scanner scan file:filename.txt \
-  --tls=false \
-  --region=us-east-1 \
-  --apikey=your-api-key \
-  --pml \
-  --feedback \
-  --verbose \
-  --active-content \
-  --tag=prod,scan \
-  --digest=false \
-  --addr=my-release-visionone-filesecurity-scanner:50051
+### Mounting NFS Shares
 
-# Available options for scanfiles command
-docker run tmfs-scanner scanfiles \
-  --path=/app/files \
-  --good \
-  --parallel \
-  --tls=false \
-  --region=us-east-1 \
-  --apikey=your-api-key \
-  --pml \
-  --feedback \
-  --verbose \
-  --active-content \
-  --tag=prod,scan \
-  --digest=false \
-  --addr=my-release-visionone-filesecurity-scanner:50051
-
-# Available Vision One regions:
-# - us-east-1 (US East)
-# - eu-central-1 (Europe Central)
-# - ap-southeast-1 (Asia Pacific Southeast 1)
-# - ap-southeast-2 (Asia Pacific Southeast 2)
-# - ap-northeast-1 (Asia Pacific Northeast 1)
-# - ap-south-1 (Asia Pacific South 1)
-# - me-central-1 (Middle East Central 1)
-```
-
-## NFS Mounting
-
-### Manual NFS Mount
-
+#### **Go SDK Version**
 ```bash
 # Start container with NFS support
 docker run -d \
   --name tmfs-nfs \
   --privileged \
+  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TLS=false \
+  -v nfs-share:/mnt/nfs:shared \
   tmfs-scanner nfs
 
 # Mount NFS share
-docker exec tmfs-nfs mount -t nfs nfs-server:/share /mnt/nfs
-
-# Scan files from NFS
-docker exec tmfs-nfs /app/tmfs scan file:/mnt/nfs/file.txt --tls=false --addr=my-release-visionone-filesecurity-scanner:50051
-```
-
-### Docker Compose with NFS
-
-```yaml
-version: '3.8'
-services:
-  tmfs-scanner:
-    build: .
-    privileged: true
-    environment:
-      - ENDPOINT=my-release-visionone-filesecurity-scanner:50051
-      - TLS=false
-    volumes:
-      - nfs-share:/mnt/nfs:shared
-    command: ["nfs"]
-```
-
-## Examples
-
-### Example 1: Scan EICAR Test File
-
-```bash
-# Create test file
-echo 'X5O!P%@AP[4\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*' > eicar.com.txt
-
-# Scan the file
-docker run --rm \
-  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
-  -e TLS=false \
-  -v $(pwd):/app/files:ro \
-  tmfs-scanner scan file:/app/files/eicar.com.txt
-```
-
-### Example 2: Batch Scan with NFS
-
-```bash
-# Start NFS container
-docker run -d --name tmfs-nfs --privileged tmfs-scanner nfs
-
-# Mount NFS and scan directory
 docker exec tmfs-nfs mount -t nfs 192.168.200.10:/mnt/nfs_share /mnt/nfs
-docker exec tmfs-nfs /app/scanfiles -path=/mnt/nfs -good --tls=false --addr=my-release-visionone-filesecurity-scanner:50051
+
+# Scan files on NFS
+docker exec tmfs-nfs /app/tmfs scan file:/mnt/nfs/suspicious-file.exe --tls=false --addr=my-release-visionone-filesecurity-scanner:50051
 ```
 
-### Example 2.1: Interactive NFS Scanning
-
+#### **CLI Version**
 ```bash
-# Run the interactive NFS scanning script
-./example-nfs-scan.sh
+# Start container with NFS support
+docker run -d \
+  --name tmfs-cli-nfs \
+  --privileged \
+  --env-file .env \
+  tmfs-cli-scanner nfs
+
+# Mount NFS share
+docker exec tmfs-cli-nfs mount -t nfs 192.168.200.10:/mnt/nfs_share /mnt/nfs
+
+# Scan files on NFS
+docker exec tmfs-cli-nfs /app/tmfs-cli-wrapper.sh scan file:/mnt/nfs/suspicious-file.exe
 ```
 
-This script will:
-1. Start a container with NFS support
-2. Mount your NFS share (192.168.200.10/mnt/nfs_share)
-3. Provide an interactive interface to scan files
-4. Clean up the container when done
-
-### Example 3: Production Configuration
-
+### NFS Configuration
 ```bash
-docker run --rm \
-  -e ENDPOINT=prod-visionone-filesecurity.company.com:50051 \
-  -e TLS=true \
-  -e APIKEY=your-production-api-key \
-  -e REGION=us-east-1 \
-  -e PML=true \
-  -e VERBOSE=true \
-  -e TAGS=prod,automated \
-  -v /path/to/files:/app/files:ro \
-  tmfs-scanner scan file:/app/files/suspicious.exe
+# NFS Server settings
+NFS_SERVER=192.168.200.10
+NFS_SHARE=/mnt/nfs_share
+
+# Docker run with NFS support
+docker run --privileged \
+  -e NFS_SERVER=192.168.200.10 \
+  -e NFS_SHARE=/mnt/nfs_share \
+  -v nfs-share:/mnt/nfs:shared \
+  tmfs-scanner monitor
 ```
 
-### Example 4: Regional Configuration Examples
-
-```bash
-# US East Region
-docker run --rm \
-  -e ENDPOINT=visionone-filesecurity.us-east-1.company.com:50051 \
-  -e REGION=us-east-1 \
-  -e APIKEY=your-us-east-api-key \
-  tmfs-scanner scan file:./test.txt
-
-# Europe Central Region
-docker run --rm \
-  -e ENDPOINT=visionone-filesecurity.eu-central-1.company.com:50051 \
-  -e REGION=eu-central-1 \
-  -e APIKEY=your-eu-central-api-key \
-  tmfs-scanner scan file:./test.txt
-
-# Asia Pacific Southeast 1 Region
-docker run --rm \
-  -e ENDPOINT=visionone-filesecurity.ap-southeast-1.company.com:50051 \
-  -e REGION=ap-southeast-1 \
-  -e APIKEY=your-ap-southeast-1-api-key \
-  tmfs-scanner scan file:./test.txt
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **NFS Mount Fails**: Ensure the container is running with `--privileged` flag
-2. **Connection Refused**: Check if the endpoint is correct and accessible
-3. **TLS Errors**: Set `TLS=false` for testing or configure proper certificates
-4. **Permission Denied**: Ensure files are readable by the container user
-
-### Debug Mode
-
-```bash
-# Run with verbose logging
-docker run --rm \
-  -e VERBOSE=true \
-  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
-  -e TLS=false \
-  tmfs-scanner scan file:./test.txt
-```
-
-### Container Shell Access
-
-```bash
-# Access container shell for debugging
-docker run -it --rm tmfs-scanner /bin/sh
-```
-
-## Security Considerations
-
-- The container runs as a non-root user (`tmfs`)
-- TLS is enabled by default for secure communication
-- Use `--privileged` only when NFS mounting is required
-- API keys should be provided via environment variables, not command line
-- Consider using Docker secrets for sensitive configuration
-
-## Real-time Malicious File Monitoring with Action Parameters
-
-The container includes real-time monitoring capabilities that automatically detect and handle malicious files. You can specify the action as a Docker parameter:
-
-### Monitor Command with Action Parameters
-
-```bash
-# Monitor with quarantine action (default)
-docker run -d \
-  --name tmfs-monitor \
-  --privileged \
-  --network host \
-  -e ENDPOINT=192.168.200.50:30230 \
-  -e TLS=false \
-  -e NFS_SERVER=192.168.200.10 \
-  -e NFS_SHARE=/mnt/nfs_share \
-  tmfs-scanner:latest \
-  monitor
-
-# Direct action commands (recommended)
-docker run -d \
-  --name tmfs-quarantine \
-  --privileged \
-  --network host \
-  -e ENDPOINT=192.168.200.50:30230 \
-  -e TLS=false \
-  -e NFS_SERVER=192.168.200.10 \
-  -e NFS_SHARE=/mnt/nfs_share \
-  tmfs-scanner:latest \
-  quarantine
-
-docker run -d \
-  --name tmfs-delete \
-  --privileged \
-  --network host \
-  -e ENDPOINT=192.168.200.50:30230 \
-  -e TLS=false \
-  -e NFS_SERVER=192.168.200.10 \
-  -e NFS_SHARE=/mnt/nfs_share \
-  tmfs-scanner:latest \
-  delete
-
-docker run -d \
-  --name tmfs-report \
-  --privileged \
-  --network host \
-  -e ENDPOINT=192.168.200.50:30230 \
-  -e TLS=false \
-  -e NFS_SERVER=192.168.200.10 \
-  -e NFS_SHARE=/mnt/nfs_share \
-  tmfs-scanner:latest \
-  report
-
-# Monitor with specific action parameter
-docker run -d \
-  --name tmfs-monitor \
-  --privileged \
-  --network host \
-  -e ENDPOINT=192.168.200.50:30230 \
-  -e TLS=false \
-  -e NFS_SERVER=192.168.200.10 \
-  -e NFS_SHARE=/mnt/nfs_share \
-  tmfs-scanner:latest \
-  monitor --action=quarantine
-
-# Monitor with delete action
-docker run -d \
-  --name tmfs-monitor \
-  --privileged \
-  --network host \
-  -e ENDPOINT=192.168.200.50:50051 \
-  -e TLS=false \
-  -e NFS_SERVER=192.168.200.10 \
-  -e NFS_SHARE=/mnt/nfs_share \
-  tmfs-scanner:latest \
-  monitor --action=delete
-
-# Monitor with report only (no action taken)
-docker run -d \
-  --name tmfs-monitor \
-  --privileged \
-  --network host \
-  -e ENDPOINT=192.168.200.50:50051 \
-  -e TLS=false \
-  -e NFS_SERVER=192.168.200.10 \
-  -e NFS_SHARE=/mnt/nfs_share \
-  tmfs-scanner:latest \
-  monitor --action=report_only
-
-# Monitor with custom parameters
-docker run -d \
-  --name tmfs-monitor \
-  --privileged \
-  --network host \
-  -e ENDPOINT=192.168.200.50:50051 \
-  -e TLS=false \
-  -e NFS_SERVER=192.168.200.10 \
-  -e NFS_SHARE=/mnt/nfs_share \
-  tmfs-scanner:latest \
-  monitor \
-  --action=quarantine \
-  --scan-interval=60 \
-  --quarantine-dir=malware_quarantine
-```
+## 🛡️ Action Modes (Quarantine/Delete)
 
 ### Available Actions
 
-#### **`quarantine`** (Default Action)
-- **What it does**: Moves malicious files to a designated quarantine directory
-- **File handling**: Files are renamed with timestamp and moved to quarantine folder
-- **Recovery**: Quarantined files can be restored if they're false positives
-- **Safety**: Files are isolated but not permanently lost
-- **Logging**: All quarantine actions are logged with timestamps
-- **Example**: `malware.exe` → `quarantine/malware.exe.quarantined_20241220_143022`
+| Action | Description | Behavior |
+|--------|-------------|----------|
+| `quarantine` | Move malicious files to quarantine | Files moved to quarantine directory with timestamp |
+| `delete` | Permanently delete malicious files | Files permanently removed from system |
+| `report_only` | Log malicious files without action | Files logged but no action taken |
 
-#### **`delete`** (Permanent Removal)
-- **What it does**: Permanently deletes malicious files from the file system
-- **File handling**: Files are immediately removed using `rm -f`
-- **Recovery**: **Files cannot be recovered** - deletion is permanent
-- **Safety**: Use with caution - ensure your scanner is accurate
-- **Logging**: All deletion actions are logged for audit purposes
-- **Example**: `malware.exe` → **permanently deleted**
+### Configuration Examples
 
-#### **`report_only`** (Monitoring Only)
-- **What it does**: Only reports malicious files without taking any action
-- **File handling**: Files remain untouched in their original location
-- **Recovery**: Files are never moved or deleted
-- **Safety**: Safest option for testing and monitoring
-- **Logging**: All detections are logged for analysis
-- **Example**: `malware.exe` → **reported but left in place**
-
-### Monitor Parameters
-
-- **`--action=<action>`**: Specify the action (quarantine, delete, report_only)
-- **`--nfs-server=<ip>`**: NFS server IP address
-- **`--nfs-share=<path>`**: NFS share path
-- **`--scan-interval=<seconds>`**: Scan interval in seconds (default: 30)
-- **`--quarantine-dir=<dir>`**: Quarantine directory name (default: quarantine)
-
-### How Real-time Monitoring Works
-
-The monitoring system operates continuously with the following workflow:
-
-#### **1. File Detection**
-- **Scan Interval**: Checks for new files every 30 seconds (configurable)
-- **File Types**: Monitors executable and script files that are commonly used for malware
-- **Recursive Scanning**: Automatically scans all subdirectories in the NFS share
-- **New File Detection**: Uses file timestamps to identify newly added files
-
-#### **2. File Types Monitored**
-The system focuses on these potentially malicious file types:
-- **Executables**: `.exe`, `.dll`, `.com`, `.scr`, `.pif`, `.msi`
-- **Scripts**: `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.wsf`, `.hta`
-- **Java**: `.jar`
-- **Registry**: `.reg`
-- **Shortcuts**: `.lnk`
-
-#### **3. Scanning Process**
-1. **Mount NFS**: Automatically mounts the NFS share if not already mounted
-2. **Find New Files**: Uses `find` command to locate new files with monitored extensions
-3. **Scan Each File**: Sends each file to the Trend Vision One scanner
-4. **Analyze Results**: Checks scan results for malicious indicators
-5. **Take Action**: Executes the specified action (quarantine/delete/report)
-6. **Log Actions**: Records all activities for audit purposes
-
-#### **4. Action Execution**
-- **Quarantine**: Moves file to quarantine directory with timestamp
-- **Delete**: Permanently removes file from file system
-- **Report**: Logs detection without modifying the file
-
-#### **5. Logging and Audit**
-- **Action Logs**: All actions are logged to `/tmp/malicious_files_*.log`
-- **Console Output**: Real-time status updates with colored output
-- **Error Handling**: Graceful handling of mount failures and scan errors
-
-### Using Docker Compose
+#### **Quarantine Mode (Default)**
 ```bash
-# Start monitoring with quarantine action
-docker-compose up tmfs-scanner
+# Go SDK Version
+docker run --rm \
+  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TLS=false \
+  -e ACTION=quarantine \
+  -e QUARANTINE_DIR=malware_quarantine \
+  -v /shared/files:/mnt/nfs:shared \
+  tmfs-scanner monitor
 
-# Start monitoring with delete action
-docker-compose up tmfs-scanner-delete
-
-# Start monitoring with report only
-docker-compose up tmfs-scanner-report
+# CLI Version
+docker run --rm \
+  --env-file .env \
+  -e ACTION=quarantine \
+  -e QUARANTINE_DIR=malware_quarantine \
+  -v /shared/files:/mnt/nfs:shared \
+  tmfs-cli-scanner monitor
 ```
 
-### Monitoring Features
-- **Real-time Detection**: Scans every 30 seconds for new files (configurable)
-- **Recursive Scanning**: Automatically scans all subdirectories
-- **File Types Monitored**: Executable and script files (.exe, .dll, .bat, .ps1, .vbs, .js, .jar, .msi, .com, .scr, .pif, .cmd, .reg, .wsf, .hta, .lnk)
-- **Automatic Action**: Quarantine, delete, or report malicious files immediately
-- **Logging**: All actions are logged for audit purposes
-- **NFS Integration**: Works with your NFS share (192.168.200.10/mnt/nfs_share)
-- **Scanner Integration**: Uses your scanner endpoint (192.168.200.50:50051)
-
-### Monitoring Logs and Troubleshooting
-
-#### **Viewing Monitoring Logs**
+#### **Delete Mode**
 ```bash
-# View real-time monitoring logs
-docker logs tmfs-monitor
+# Go SDK Version
+docker run --rm \
+  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TLS=false \
+  -e ACTION=delete \
+  -v /shared/files:/mnt/nfs:shared \
+  tmfs-scanner monitor
 
-# Follow logs in real-time
+# CLI Version
+docker run --rm \
+  --env-file .env \
+  -e ACTION=delete \
+  -v /shared/files:/mnt/nfs:shared \
+  tmfs-cli-scanner monitor
+```
+
+#### **Report Only Mode**
+```bash
+# Go SDK Version
+docker run --rm \
+  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TLS=false \
+  -e ACTION=report_only \
+  -v /shared/files:/mnt/nfs:shared \
+  tmfs-scanner monitor
+
+# CLI Version
+docker run --rm \
+  --env-file .env \
+  -e ACTION=report_only \
+  -v /shared/files:/mnt/nfs:shared \
+  tmfs-cli-scanner monitor
+```
+
+## 🔍 Usage Examples
+
+### Single File Scanning
+
+#### **Go SDK Version**
+```bash
+# Scan a local file
+docker run --rm \
+  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TLS=false \
+  -v /path/to/file:/app/file:ro \
+  tmfs-scanner scan /app/file
+
+# Using Makefile
+make scan FILE=/path/to/file ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TLS=false
+```
+
+#### **CLI Version**
+```bash
+# Scan a local file
+docker run --rm \
+  --env-file .env \
+  -v /path/to/file:/app/file:ro \
+  tmfs-cli-scanner scan /app/file
+
+# Using Makefile
+make -f Makefile.cli scan FILE=/path/to/file
+```
+
+### Directory Scanning
+
+#### **Go SDK Version**
+```bash
+# Scan a directory
+docker run --rm \
+  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TLS=false \
+  -v /path/to/directory:/app/dir:ro \
+  tmfs-scanner scanfiles -path=/app/dir -good
+
+# Using Makefile
+make scan-dir DIR=/path/to/directory ENDPOINT=my-release-visionone-filesecurity-scanner:50051 TLS=false
+```
+
+#### **CLI Version**
+```bash
+# Scan a directory
+docker run --rm \
+  --env-file .env \
+  -v /path/to/directory:/app/dir:ro \
+  tmfs-cli-scanner scan-dir /app/dir
+
+# Using Makefile
+make -f Makefile.cli scan-dir DIR=/path/to/directory
+```
+
+### Real-time Monitoring
+
+#### **Go SDK Version**
+```bash
+# Start monitoring with NFS support
+docker run -d \
+  --name tmfs-monitor \
+  --privileged \
+  -e ENDPOINT=my-release-visionone-filesecurity-scanner:50051 \
+  -e TLS=false \
+  -e ACTION=quarantine \
+  -e SCAN_INTERVAL=60 \
+  -v nfs-share:/mnt/nfs:shared \
+  tmfs-scanner monitor
+
+# Check logs
 docker logs -f tmfs-monitor
-
-# View specific action logs
-docker exec tmfs-monitor cat /tmp/malicious_files_quarantined.log
-docker exec tmfs-monitor cat /tmp/malicious_files_deleted.log
-docker exec tmfs-monitor cat /tmp/malicious_files_reported.log
 ```
 
-#### **Monitoring Status Indicators**
-- 🟢 **Green**: File is clean
-- 🟡 **Yellow**: Warning or skipped file
-- 🔴 **Red**: Malicious file detected
-- 🚨 **Alert**: Action taken (quarantine/delete)
+#### **CLI Version**
+```bash
+# Start monitoring with NFS support
+docker run -d \
+  --name tmfs-cli-monitor \
+  --privileged \
+  --env-file .env \
+  -e ACTION=quarantine \
+  -e SCAN_INTERVAL=60 \
+  -v nfs-share:/mnt/nfs:shared \
+  tmfs-cli-scanner monitor
 
-#### **Common Monitoring Issues**
-1. **NFS Mount Fails**: Check NFS server connectivity and permissions
-2. **Scanner Connection**: Verify endpoint is accessible and scanner is running
-3. **Permission Denied**: Ensure container has proper NFS mount permissions
-4. **No Files Detected**: Check if files have monitored extensions
+# Check logs
+docker logs -f tmfs-cli-monitor
+```
 
-#### **Monitoring Best Practices**
-- **Start with `report_only`**: Test monitoring without taking action
-- **Monitor logs**: Regularly check action logs for false positives
-- **Adjust scan interval**: Increase interval for large file systems
-- **Backup quarantine**: Regularly backup quarantine directory
-- **Test scanner**: Verify scanner accuracy before using delete action
+## 🧪 Testing
 
-## License
+### Test Commands
 
-This project is based on the [Trend Vision One File Security Go SDK](https://github.com/trendmicro/tm-v1-fs-golang-sdk) which is licensed under MIT. 
+#### **Go SDK Version**
+```bash
+# Run tests
+make test
+
+# Test NFS connectivity
+./test-nfs-connectivity.sh
+
+# Test with EICAR file
+./test.sh
+```
+
+#### **CLI Version**
+```bash
+# Run tests
+make -f Makefile.cli test
+
+# Test local endpoint
+make -f Makefile.cli test-local
+
+# Test with CLI
+./test-cli.sh
+```
+
+## 📊 Monitoring Dashboard
+
+Both versions provide a real-time monitoring dashboard showing:
+
+- Current scan status
+- Latest malicious file detected
+- Counters for malicious, quarantined, deleted, and clean files
+- Scan interval and configuration
+- Action mode (quarantine/delete/report)
+
+## 📝 Log Files
+
+Monitoring creates log files for tracking:
+
+- `/tmp/malicious_files_quarantined.log` - Quarantined files
+- `/tmp/malicious_files_deleted.log` - Deleted files  
+- `/tmp/malicious_files_reported.log` - Reported files
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+1. **NFS Mount Issues**
+   ```bash
+   # Ensure container runs with --privileged flag
+   docker run --privileged ...
+   
+   # Check NFS server accessibility
+   docker exec container showmount -e 192.168.200.10
+   ```
+
+2. **Permission Issues**
+   ```bash
+   # Check file permissions
+   docker exec container ls -la /mnt/nfs
+   
+   # Ensure proper ownership
+   docker exec container chown -R tmfs:tmfs /mnt/nfs
+   ```
+
+3. **Endpoint Connectivity**
+   ```bash
+   # Test endpoint connectivity
+   docker exec container telnet my-release-visionone-filesecurity-scanner 50051
+   ```
+
+### Debug Mode
+
+Enable debug output by setting environment variables:
+
+```bash
+# Enable verbose output
+VERBOSE=true
+
+# Enable debug logging
+DEBUG=true
+```
+
+## 📚 Documentation
+
+- **Go SDK Version**: See [README.md](README.md) for detailed documentation
+- **CLI Version**: See [README-CLI.md](README-CLI.md) for CLI-specific documentation
+
+## 🤝 Support
+
+For issues related to:
+- **Trend Vision One API**: Contact Trend Micro Support
+- **Docker Container**: Check this repository's issues
+- **NFS Configuration**: Check your NFS server configuration
+
+## 📄 License
+
+This project is provided as-is for educational and testing purposes. Please ensure compliance with Trend Micro's terms of service and your organization's security policies. 

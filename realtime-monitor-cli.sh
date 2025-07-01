@@ -1,12 +1,10 @@
-#!/bin/sh
-# Real-time malicious file monitoring with action parameters
+#!/bin/bash
+# Real-time malicious file monitoring using Trend Vision One CLI
 # Supports: quarantine, delete, report_only
 # Recursive scanning of all subdirectories
 
 # Default values
-NFS_SERVER=${NFS_SERVER:-"192.168.200.10"}
-NFS_SHARE=${NFS_SHARE:-"/mnt/nfs_share"}
-ENDPOINT=${ENDPOINT:-"192.168.200.50:50051"}
+LOCAL_PATH=${LOCAL_PATH:-"/mnt/nfs-share"}
 ACTION=${ACTION:-"quarantine"}
 SCAN_INTERVAL=${SCAN_INTERVAL:-30}
 QUARANTINE_DIR=${QUARANTINE_DIR:-"quarantine"}
@@ -33,10 +31,9 @@ print_alert() {
     echo -e "${RED}🚨 $1${NC}"
 }
 
-echo "🛡️ Real-time Malicious File Monitor"
-echo "==================================="
-echo "NFS Share: $NFS_SERVER:$NFS_SHARE"
-echo "Scanner: $ENDPOINT"
+echo "🛡️ Real-time Malicious File Monitor (CLI Version)"
+echo "=================================================="
+echo "Local Path: $LOCAL_PATH"
 echo "Action: $ACTION"
 echo "Scan Interval: ${SCAN_INTERVAL}s"
 echo "Recursive: Enabled (all subdirectories)"
@@ -53,33 +50,21 @@ case "$ACTION" in
         ;;
 esac
 
-# Mount NFS share if not already mounted
-if ! mountpoint -q /mnt/nfs; then
-    echo "📁 Mounting NFS share..."
-    # Try to mount with sudo if available, otherwise try direct mount
-    if command -v sudo >/dev/null 2>&1; then
-        if sudo mount -t nfs "$NFS_SERVER:$NFS_SHARE" /mnt/nfs; then
-            print_status "NFS share mounted successfully with sudo"
-        else
-            print_error "Failed to mount NFS share with sudo"
-            exit 1
-        fi
-    else
-        if mount -t nfs "$NFS_SERVER:$NFS_SHARE" /mnt/nfs; then
-            print_status "NFS share mounted successfully"
-        else
-            print_error "Failed to mount NFS share"
-            print_error "Note: Container needs to run with --privileged flag"
-            exit 1
-        fi
-    fi
+# Check if local path exists
+if [ ! -d "$LOCAL_PATH" ]; then
+    echo "📁 Checking local path: $LOCAL_PATH"
+    print_error "Local path does not exist: $LOCAL_PATH"
+    print_error "Please ensure the path exists on the host and is mounted into the container"
+    exit 1
 fi
+
+print_status "Local path is accessible: $LOCAL_PATH"
 
 # Create quarantine directory if needed
 if [ "$ACTION" = "quarantine" ]; then
     echo "📦 Creating quarantine directory..."
-    mkdir -p "/mnt/nfs/$QUARANTINE_DIR"
-    print_status "Quarantine directory ready: /mnt/nfs/$QUARANTINE_DIR"
+    mkdir -p "$LOCAL_PATH/$QUARANTINE_DIR"
+    print_status "Quarantine directory ready: $LOCAL_PATH/$QUARANTINE_DIR"
 fi
 
 echo ""
@@ -95,10 +80,9 @@ touch /tmp/last_scan
 # Monitoring loop
 while true; do
     clear
-    echo "🛡️ Real-time Malicious File Monitor"
-    echo "==================================="
-    echo "NFS Share: $NFS_SERVER:$NFS_SHARE"
-    echo "Scanner: $ENDPOINT"
+    echo "🛡️ Real-time Malicious File Monitor (CLI Version)"
+    echo "=================================================="
+    echo "Local Path: $LOCAL_PATH"
     echo "Action: $ACTION"
     echo "Scan Interval: ${SCAN_INTERVAL}s"
     echo "Recursive: Enabled (all subdirectories)"
@@ -111,11 +95,11 @@ while true; do
     DELETED_COUNT=0
     REPORTED_COUNT=0
     
-    echo "🔄 Scanning for new files... ($(date))"
+    echo "🔄 Scanning for files... ($(date))"
     # Scan every file, regardless of extension and modification time
-    NEW_FILES=$(find /mnt/nfs -type f 2>/dev/null || true)
+    NEW_FILES=$(find "$LOCAL_PATH" -type f 2>/dev/null || true)
     if [ -n "$NEW_FILES" ]; then
-        echo "📋 Found new files to scan:"
+        echo "📋 Found files to scan:"
         echo "$NEW_FILES" | while read -r file; do
             if [ -n "$file" ]; then
                 echo "  - $file"
@@ -124,20 +108,26 @@ while true; do
                     echo "    ⏭️  Skipping (quarantine directory)"
                     continue
                 fi
-                # Scan the file
+                # Scan the file using CLI
                 echo "    🔍 Scanning..."
-                SCAN_RESULT=$(/app/tmfs scan "file:$file" --tls=false --addr="$ENDPOINT" 2>&1 || true)
-                # Check if malicious by parsing JSON output
-                if echo "$SCAN_RESULT" | grep -q '"scanResult":[1-9]' || echo "$SCAN_RESULT" | grep -q '"foundMalwares":\[[^]]*[^]]\]'; then
+                SCAN_RESULT=$(/app/tmfs-cli-wrapper.sh scan "file:$file" 2>&1 || true)
+                
+                # Parse CLI scan result for malicious detection
+                # CLI typically returns JSON or structured output
+                if echo "$SCAN_RESULT" | grep -q '"status":"malicious"\|"threat_level":"high"\|"malicious":true\|"risk":"high"' || \
+                   echo "$SCAN_RESULT" | grep -q "MALICIOUS\|THREAT\|VIRUS\|MALWARE\|SUSPICIOUS" || \
+                   echo "$SCAN_RESULT" | grep -q "Risk Level: High\|Risk Level: Critical"; then
+                    
                     print_alert "MALICIOUS FILE DETECTED: $file"
                     echo "    Scan result: $SCAN_RESULT"
                     MALICIOUS_COUNT=$((MALICIOUS_COUNT+1))
                     LATEST_MALICIOUS="$file"
+                    
                     case "$ACTION" in
                         "quarantine")
                             echo "    🚨 Quarantining file..."
                             FILENAME=$(basename "$file")
-                            QUARANTINE_PATH="/mnt/nfs/$QUARANTINE_DIR/${FILENAME}.quarantined_$(date +%Y%m%d_%H%M%S)"
+                            QUARANTINE_PATH="$LOCAL_PATH/$QUARANTINE_DIR/${FILENAME}.quarantined_$(date +%Y%m%d_%H%M%S)"
                             if mv "$file" "$QUARANTINE_PATH"; then
                                 print_status "File quarantined: $file → $QUARANTINE_PATH"
                                 echo "QUARANTINED: $file -> $QUARANTINE_PATH at $(date)" >> /tmp/malicious_files_quarantined.log
@@ -169,7 +159,7 @@ while true; do
             fi
         done
     else
-        echo "  No new files to scan"
+        echo "  No files to scan"
     fi
     echo ""
     echo "===== Scan Status ====="
